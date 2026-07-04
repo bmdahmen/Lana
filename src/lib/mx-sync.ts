@@ -1,5 +1,5 @@
 import { listMemberAccounts, listMemberTransactions } from "@/lib/mx";
-import { applyCategoryRules, defaultCategoryForMx, type CategoryRule } from "@/lib/categorize";
+import { applyCategoryRules, defaultCategoryFromLabel, type CategoryRule } from "@/lib/categorize";
 import { newId } from "@/lib/db";
 import { recomputeNetWorth } from "@/lib/sync";
 
@@ -52,7 +52,7 @@ export async function syncMxMember(
       name: tx.description,
       merchant_name: null,
     });
-    const categoryId = ruleMatch ?? defaultCategoryForMx(tx.category);
+    const categoryId = ruleMatch ?? defaultCategoryFromLabel(tx.category);
 
     await db
       .prepare(

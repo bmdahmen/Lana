@@ -59,18 +59,24 @@ Lana has no password — it uses [Google Identity Services](https://developers.g
 | `PLAID_SECRET` | Matching secret for your `PLAID_ENV` (sandbox/development/production). |
 | `PLAID_ENV` | `sandbox`, `development`, or `production`. |
 | `PLAID_WEBHOOK_URL` | Optional. Your deployed URL + `/api/plaid/webhook`, so Plaid can push transaction updates instead of relying on manual sync. |
-| `MX_CLIENT_ID` | From the [MX dashboard](https://dashboard.mx.com) — used for brokerages Plaid doesn't reach (Vanguard, Fidelity, Schwab, Robinhood). |
+| `MX_CLIENT_ID` | From MX's partner dashboard — used for brokerages Plaid doesn't reach (Vanguard, Fidelity, Schwab, Robinhood investing). |
 | `MX_API_KEY` | Matching API key for your `MX_ENV`. |
 | `MX_ENV` | `sandbox` or `production`. Sandbox uses `int-api.mx.com`, production uses `api.mx.com`. |
+| `ERA_API_KEY` | API key from [Era](https://era.app) — used to pull accounts/transactions Era already has connected (e.g. Robinhood Banking/Credit Card) that neither Plaid nor MX can reach directly. |
 
-## MX setup (Vanguard, Fidelity, Schwab, Robinhood, and other brokerages)
+## MX setup (Vanguard, Fidelity, Schwab, Robinhood investing)
 
 Plaid doesn't support most brokerages' investment accounts, so Lana uses
 [MX](https://www.mx.com) as a second aggregator just for those. Everything else
 (regular banks, PayPal, credit cards) still goes through Plaid.
 
-1. Sign up at https://dashboard.mx.com and grab your **Client ID** and **API Key**
-   from Settings → Keys. Start with the sandbox keys.
+**Note:** unlike Plaid, MX doesn't offer instant self-serve signup — getting a
+`MX_CLIENT_ID`/`MX_API_KEY` requires going through MX's partner application
+process, not just creating an account. Budget for that separately; it's not a
+five-minute setup.
+
+1. Apply for MX partner/developer access and grab your **Client ID** and **API
+   Key** once approved. Start with the sandbox keys.
 2. Set `MX_CLIENT_ID`, `MX_API_KEY`, and `MX_ENV=sandbox` in `.env.local`.
 3. On the Dashboard or Accounts page, click **"Link brokerage / bank (MX)"** —
    it opens MX's Connect widget in a modal, the same kind of flow as Plaid Link.
@@ -81,6 +87,31 @@ Plaid doesn't support most brokerages' investment accounts, so Lana uses
 Unlike Plaid, MX doesn't have a cursor-based sync — every sync just re-pulls the
 last ~120 days of transactions and upserts by MX's transaction GUID, so it's
 safe to call `/api/mx/sync` as often as you like.
+
+## Era setup (accounts Era already has connected)
+
+If you use [Era](https://era.app) as a personal finance assistant and it already
+has accounts connected (via its own aggregator relationships) that Lana can't
+reach through Plaid or MX — e.g. Robinhood Banking/Credit Card — Lana can pull
+that same data through Era's MCP-based API, read-only, for accounts that are
+actually yours.
+
+1. Get an API key from Era (Settings → Developer/API in the Era dashboard).
+2. Set `ERA_API_KEY` in `.env.local` (or as a Worker secret in production).
+3. Click **"Sync from Era"** on the Dashboard or Accounts page. There's no
+   link/connect flow — it just pulls whatever Era already has, creating or
+   updating the matching accounts and transactions in Lana.
+
+Two things worth knowing:
+
+- **Era's own plan limits can obfuscate balances.** If your Era plan caps
+  visible accounts, some accounts come back with no balance data at all — Lana
+  skips syncing those rather than writing a false $0, so they simply won't
+  appear until your Era plan shows real numbers for them.
+- **This isn't a live webhook-driven sync.** Era's programmatic access is an
+  MCP server, not a conventional REST API with a webhook system Lana can
+  subscribe to, so "Sync from Era" is manual/on-demand only — click it whenever
+  you want fresh numbers.
 
 ## Database
 
@@ -99,6 +130,8 @@ Schema lives in `migrations/*.sql`, applied in order. The Cloudflare D1 database
   new transactions are ready, which syncs that item immediately.
 - `/api/mx/sync` (POST) does the same for every MX-linked brokerage/bank member.
   MX pushes updates to `/api/mx/webhook` if you've registered one (see MX setup above).
+- `/api/era/sync` (POST) pulls current accounts/transactions from Era. Manual/
+  on-demand only — Era has no webhook system to push updates automatically.
 
 ## Deploying to Cloudflare
 
@@ -117,6 +150,10 @@ npx wrangler secret put PLAID_CLIENT_ID
 npx wrangler secret put PLAID_SECRET
 npx wrangler secret put PLAID_ENV
 npx wrangler secret put PLAID_WEBHOOK_URL
+npx wrangler secret put MX_CLIENT_ID
+npx wrangler secret put MX_API_KEY
+npx wrangler secret put MX_ENV
+npx wrangler secret put ERA_API_KEY
 ```
 
 `NEXT_PUBLIC_GOOGLE_CLIENT_ID` is different: Next.js inlines `NEXT_PUBLIC_*`

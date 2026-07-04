@@ -68,3 +68,19 @@ export function deriveMxAssetClass(type: string, subtype: string | null): AssetC
   }
   return "other";
 }
+
+export function deriveEraAssetClass(type: string, name: string): AssetClass {
+  const lowerType = type.toLowerCase();
+  const lowerName = name.toLowerCase();
+
+  if (lowerType === "checking" || lowerType === "savings") return "cash";
+  if (lowerType === "creditcard" || lowerType === "loan" || lowerType === "mortgage") {
+    return "liabilities";
+  }
+  if (lowerType === "brokerage" || lowerType === "investment") {
+    if (/ira|401k|401\(k\)|403b|pension|retirement/.test(lowerName)) return "retirement";
+    if (/crypto/.test(lowerName)) return "crypto";
+    return "brokerage";
+  }
+  return "other";
+}

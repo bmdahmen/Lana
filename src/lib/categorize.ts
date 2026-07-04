@@ -36,7 +36,7 @@ export function defaultCategoryFor(
   return "cat_other";
 }
 
-const MX_CATEGORY_KEYWORDS: Array<[RegExp, string]> = [
+const LABEL_CATEGORY_KEYWORDS: Array<[RegExp, string]> = [
   [/paycheck|payroll|salary|income/, "cat_income"],
   [/transfer/, "cat_transfer"],
   [/rent|mortgage/, "cat_housing"],
@@ -54,10 +54,10 @@ const MX_CATEGORY_KEYWORDS: Array<[RegExp, string]> = [
   [/shopping|merchandise|retail|clothing/, "cat_shopping"],
 ];
 
-export function defaultCategoryForMx(mxCategory: string | null | undefined): string {
-  if (!mxCategory) return "cat_other";
-  const lower = mxCategory.toLowerCase();
-  for (const [pattern, categoryId] of MX_CATEGORY_KEYWORDS) {
+export function defaultCategoryFromLabel(label: string | null | undefined): string {
+  if (!label) return "cat_other";
+  const lower = label.toLowerCase();
+  for (const [pattern, categoryId] of LABEL_CATEGORY_KEYWORDS) {
     if (pattern.test(lower)) return categoryId;
   }
   return "cat_other";

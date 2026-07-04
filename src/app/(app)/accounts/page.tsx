@@ -4,6 +4,7 @@ import { ASSET_CLASSES } from "@/lib/asset-classes";
 import { AddManualAccountButton } from "@/components/add-manual-account-button";
 import { AccountRowActions } from "@/components/account-row-actions";
 import { LinkMxAccountButton } from "@/components/link-mx-account-button";
+import { EraSyncButton } from "@/components/era-sync-button";
 
 interface AccountRow {
   id: string;
@@ -39,6 +40,7 @@ export default async function AccountsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Accounts</h1>
         <div className="flex gap-2">
+          <EraSyncButton />
           <LinkMxAccountButton />
           <AddManualAccountButton />
         </div>
