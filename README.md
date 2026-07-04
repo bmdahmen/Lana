@@ -107,6 +107,26 @@ To preview the production build locally against real Cloudflare bindings:
 npm run cf:preview
 ```
 
+## Auto-deploy on push
+
+`.github/workflows/deploy.yml` deploys to Cloudflare automatically on every push
+to `main` (and can be triggered manually from the Actions tab). It needs two
+repository secrets, set at **GitHub repo → Settings → Secrets and variables →
+Actions → New repository secret**:
+
+| Secret | Value |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | An API token from https://dash.cloudflare.com/profile/api-tokens using the **"Edit Cloudflare Workers"** template. This is different from `wrangler login` (which only authenticates your own machine) — CI needs its own token. |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Same value as in your `.env.local` — needed at build time to bake into the client bundle. |
+
+Runtime secrets (`SESSION_SECRET`, `GOOGLE_ALLOWED_EMAIL`, `PLAID_CLIENT_ID`,
+`PLAID_SECRET`, `PLAID_ENV`) are already stored on the Worker itself via
+`wrangler secret put` — the CI job doesn't need them, since they're read from
+the Cloudflare runtime, not baked in at build time.
+
+Once both secrets are set, just `git push` to `main` and the deploy happens on
+its own — no more running `npm run cf:deploy` by hand.
+
 ## Architecture notes
 
 - **Auth**: Google sign-in only (no password) via Google Identity Services,
