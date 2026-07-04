@@ -1,6 +1,7 @@
 import { getDB } from "@/lib/db";
 import { formatCurrency } from "@/lib/format";
-import { ASSET_CLASSES } from "@/lib/asset-classes";
+import { ASSET_CLASSES, type PreciousMetal } from "@/lib/asset-classes";
+import { recomputeMetalAccountBalances } from "@/lib/spot-price";
 import { AddManualAccountButton } from "@/components/add-manual-account-button";
 import { AccountRowActions } from "@/components/account-row-actions";
 import { LinkMxAccountButton } from "@/components/link-mx-account-button";
@@ -17,16 +18,20 @@ interface AccountRow {
   asset_class: string;
   institution_name: string | null;
   item_status: string | null;
+  precious_metal: PreciousMetal | null;
+  metal_troy_oz: number | null;
 }
 
 const CLASS_LABEL = new Map<string, string>(ASSET_CLASSES.map((c) => [c.id, c.label]));
 
 export default async function AccountsPage() {
   const db = await getDB();
+  await recomputeMetalAccountBalances(db);
   const result = await db
     .prepare(
       `SELECT a.id, a.name, a.official_name, a.mask, a.current_balance, a.is_manual, a.is_hidden,
-              a.asset_class, p.institution_name, p.status as item_status
+              a.asset_class, p.institution_name, p.status as item_status,
+              a.precious_metal, a.metal_troy_oz
        FROM account a
        LEFT JOIN plaid_item p ON p.id = a.plaid_item_id
        WHERE a.is_closed = 0
@@ -66,6 +71,11 @@ export default async function AccountsPage() {
                   <td className="px-4 py-3">
                     <p className="font-medium text-zinc-900 dark:text-zinc-50">{acc.name}</p>
                     {acc.mask && <p className="text-xs text-zinc-500">•••• {acc.mask}</p>}
+                    {acc.precious_metal && (
+                      <p className="text-xs text-zinc-500">
+                        {acc.metal_troy_oz} troy oz {acc.precious_metal}
+                      </p>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                     {CLASS_LABEL.get(acc.asset_class) ?? acc.asset_class}
@@ -82,7 +92,12 @@ export default async function AccountsPage() {
                     {formatCurrency(acc.current_balance ?? 0)}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <AccountRowActions accountId={acc.id} isHidden={!!acc.is_hidden} isManual={!!acc.is_manual} />
+                    <AccountRowActions
+                      accountId={acc.id}
+                      isHidden={!!acc.is_hidden}
+                      isManual={!!acc.is_manual}
+                      preciousMetal={acc.precious_metal}
+                    />
                   </td>
                 </tr>
               ))}

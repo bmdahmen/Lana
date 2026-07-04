@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getDB, newId } from "@/lib/db";
 import { recomputeNetWorth } from "@/lib/sync";
-import { isAssetClassLiability } from "@/lib/asset-classes";
+import { isAssetClassLiability, PRECIOUS_METALS } from "@/lib/asset-classes";
+import { getSpotPrices } from "@/lib/spot-price";
 
 export async function GET() {
   const db = await getDB();
@@ -19,20 +20,31 @@ export async function GET() {
   return NextResponse.json({ accounts: result.results ?? [] });
 }
 
-const createSchema = z.object({
-  name: z.string().min(1),
-  assetClass: z.enum([
-    "cash",
-    "brokerage",
-    "retirement",
-    "crypto",
-    "real_estate",
-    "hard_asset",
-    "liabilities",
-    "other",
-  ]),
-  currentBalance: z.number(),
-});
+const createSchema = z
+  .object({
+    name: z.string().min(1),
+    assetClass: z.enum([
+      "cash",
+      "brokerage",
+      "retirement",
+      "crypto",
+      "real_estate",
+      "hard_asset",
+      "precious_metals",
+      "liabilities",
+      "other",
+    ]),
+    currentBalance: z.number().optional(),
+    preciousMetal: z.enum(PRECIOUS_METALS).optional(),
+    metalTroyOz: z.number().positive().optional(),
+  })
+  .refine(
+    (data) =>
+      data.assetClass === "precious_metals"
+        ? data.preciousMetal !== undefined && data.metalTroyOz !== undefined
+        : data.currentBalance !== undefined,
+    { message: "Missing required fields for this account type" }
+  );
 
 export async function POST(request: Request) {
   const body = createSchema.safeParse(await request.json());
@@ -44,12 +56,28 @@ export async function POST(request: Request) {
   const id = newId("acct");
   const isAsset = !isAssetClassLiability(body.data.assetClass);
 
+  let currentBalance = body.data.currentBalance ?? 0;
+  if (body.data.assetClass === "precious_metals" && body.data.preciousMetal && body.data.metalTroyOz) {
+    const prices = await getSpotPrices(db);
+    currentBalance = body.data.metalTroyOz * prices[body.data.preciousMetal];
+  }
+
   await db
     .prepare(
-      `INSERT INTO account (id, name, type, current_balance, is_manual, is_asset, asset_class)
-       VALUES (?, ?, 'other', ?, 1, ?, ?)`
+      `INSERT INTO account (
+         id, name, type, current_balance, is_manual, is_asset, asset_class,
+         precious_metal, metal_troy_oz
+       ) VALUES (?, ?, 'other', ?, 1, ?, ?, ?, ?)`
     )
-    .bind(id, body.data.name, body.data.currentBalance, isAsset ? 1 : 0, body.data.assetClass)
+    .bind(
+      id,
+      body.data.name,
+      currentBalance,
+      isAsset ? 1 : 0,
+      body.data.assetClass,
+      body.data.preciousMetal ?? null,
+      body.data.metalTroyOz ?? null
+    )
     .run();
 
   await recomputeNetWorth(db);

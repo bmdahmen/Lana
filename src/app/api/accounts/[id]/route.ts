@@ -3,12 +3,14 @@ import { z } from "zod";
 import { getDB } from "@/lib/db";
 import { recomputeNetWorth } from "@/lib/sync";
 import { isAssetClassLiability } from "@/lib/asset-classes";
+import { getSpotPrices } from "@/lib/spot-price";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
   isHidden: z.boolean().optional(),
   isClosed: z.boolean().optional(),
   currentBalance: z.number().optional(),
+  metalTroyOz: z.number().positive().optional(),
   assetClass: z
     .enum([
       "cash",
@@ -17,6 +19,7 @@ const updateSchema = z.object({
       "crypto",
       "real_estate",
       "hard_asset",
+      "precious_metals",
       "liabilities",
       "other",
     ])
@@ -52,6 +55,18 @@ export async function PATCH(
   if (body.data.currentBalance !== undefined) {
     updates.push("current_balance = ?");
     bindings.push(body.data.currentBalance);
+  }
+  if (body.data.metalTroyOz !== undefined) {
+    const account = await db
+      .prepare("SELECT precious_metal FROM account WHERE id = ?")
+      .bind(id)
+      .first<{ precious_metal: "gold" | "silver" | null }>();
+    if (!account?.precious_metal) {
+      return NextResponse.json({ error: "Account is not a precious metal account" }, { status: 400 });
+    }
+    const prices = await getSpotPrices(db);
+    updates.push("metal_troy_oz = ?", "current_balance = ?");
+    bindings.push(body.data.metalTroyOz, body.data.metalTroyOz * prices[account.precious_metal]);
   }
   if (body.data.assetClass !== undefined) {
     updates.push("asset_class = ?", "is_asset = ?");

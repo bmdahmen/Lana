@@ -5,6 +5,7 @@ export type AssetClass =
   | "crypto"
   | "real_estate"
   | "hard_asset"
+  | "precious_metals"
   | "liabilities"
   | "other";
 
@@ -15,9 +16,13 @@ export const ASSET_CLASSES: { id: AssetClass; label: string; colorVar: string }[
   { id: "crypto", label: "Crypto", colorVar: "--chart-crypto" },
   { id: "real_estate", label: "Real Estate", colorVar: "--chart-real-estate" },
   { id: "hard_asset", label: "Hard Assets", colorVar: "--chart-hard-asset" },
+  { id: "precious_metals", label: "Precious Metals", colorVar: "--chart-precious-metals" },
   { id: "liabilities", label: "Liabilities", colorVar: "--chart-liabilities" },
   { id: "other", label: "Other", colorVar: "--chart-other" },
 ];
+
+export const PRECIOUS_METALS = ["gold", "silver"] as const;
+export type PreciousMetal = (typeof PRECIOUS_METALS)[number];
 
 const RETIREMENT_SUBTYPES = new Set([
   "401k",

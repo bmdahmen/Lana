@@ -2,15 +2,18 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import type { PreciousMetal } from "@/lib/asset-classes";
 
 export function AccountRowActions({
   accountId,
   isHidden,
   isManual,
+  preciousMetal,
 }: {
   accountId: string;
   isHidden: boolean;
   isManual: boolean;
+  preciousMetal?: PreciousMetal | null;
 }) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
@@ -38,7 +41,21 @@ export function AccountRowActions({
       >
         {isHidden ? "Unhide" : "Hide"}
       </button>
-      {isManual && (
+      {isManual && preciousMetal && (
+        <button
+          disabled={submitting}
+          onClick={() => {
+            const value = prompt(`New amount (troy oz of ${preciousMetal})`);
+            if (value !== null && !Number.isNaN(Number(value)) && Number(value) > 0) {
+              patch({ metalTroyOz: Number(value) });
+            }
+          }}
+          className="text-zinc-500 hover:text-zinc-900 disabled:opacity-50 dark:hover:text-zinc-50"
+        >
+          Update ounces
+        </button>
+      )}
+      {isManual && !preciousMetal && (
         <button
           disabled={submitting}
           onClick={() => {

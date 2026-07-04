@@ -87,6 +87,19 @@ Unlike Plaid, MX doesn't have a cursor-based sync — every sync just re-pulls t
 last ~120 days of transactions and upserts by MX's transaction GUID, so it's
 safe to call `/api/mx/sync` as often as you like.
 
+## Precious metals (gold, silver)
+
+The "Add manual account" flow special-cases the **Precious Metals** category:
+instead of entering a dollar balance, you enter a troy ounce quantity and pick
+gold or silver. The balance is computed as `troy_oz * spot_price` and kept
+current automatically — `src/lib/spot-price.ts` fetches USD-per-troy-ounce spot
+prices from the free, unauthenticated [gold-api.com](https://api.gold-api.com)
+(`XAU`/`XAG`), caches them in the `spot_price` table, and refreshes at most
+once an hour. The dashboard and Accounts page both trigger a refresh check on
+load, so no separate cron job is needed. Use "Update ounces" on the Accounts
+page to change the quantity later; the dollar value recalculates from the
+latest cached spot price.
+
 ## Database
 
 Schema lives in `migrations/*.sql`, applied in order. The Cloudflare D1 database

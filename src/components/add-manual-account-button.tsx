@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ASSET_CLASSES } from "@/lib/asset-classes";
+import { ASSET_CLASSES, PRECIOUS_METALS, type PreciousMetal } from "@/lib/asset-classes";
+import { formatCurrency } from "@/lib/format";
 
 export function AddManualAccountButton() {
   const router = useRouter();
@@ -10,7 +11,20 @@ export function AddManualAccountButton() {
   const [name, setName] = useState("");
   const [assetClass, setAssetClass] = useState(ASSET_CLASSES[0].id);
   const [balance, setBalance] = useState("");
+  const [preciousMetal, setPreciousMetal] = useState<PreciousMetal>("gold");
+  const [troyOz, setTroyOz] = useState("");
+  const [spotPrices, setSpotPrices] = useState<Record<PreciousMetal, number> | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const isPreciousMetal = assetClass === "precious_metals";
+
+  useEffect(() => {
+    if (!isPreciousMetal || spotPrices) return;
+    fetch("/api/spot-price")
+      .then((res) => res.json() as Promise<Record<PreciousMetal, number>>)
+      .then(setSpotPrices)
+      .catch(() => {});
+  }, [isPreciousMetal, spotPrices]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -19,15 +33,16 @@ export function AddManualAccountButton() {
       await fetch("/api/accounts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          assetClass,
-          currentBalance: Number(balance),
-        }),
+        body: JSON.stringify(
+          isPreciousMetal
+            ? { name, assetClass, preciousMetal, metalTroyOz: Number(troyOz) }
+            : { name, assetClass, currentBalance: Number(balance) }
+        ),
       });
       setOpen(false);
       setName("");
       setBalance("");
+      setTroyOz("");
       router.refresh();
     } finally {
       setSubmitting(false);
@@ -77,20 +92,62 @@ export function AddManualAccountButton() {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Current balance
-                </label>
-                <input
-                  required
-                  type="number"
-                  step="0.01"
-                  value={balance}
-                  onChange={(e) => setBalance(e.target.value)}
-                  placeholder="Liabilities: enter a positive amount owed"
-                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
-                />
-              </div>
+              {isPreciousMetal ? (
+                <>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      Metal
+                    </label>
+                    <select
+                      value={preciousMetal}
+                      onChange={(e) => setPreciousMetal(e.target.value as PreciousMetal)}
+                      className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
+                    >
+                      {PRECIOUS_METALS.map((m) => (
+                        <option key={m} value={m}>
+                          {m[0].toUpperCase() + m.slice(1)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      Troy ounces
+                    </label>
+                    <input
+                      required
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      value={troyOz}
+                      onChange={(e) => setTroyOz(e.target.value)}
+                      placeholder="e.g. 10"
+                      className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
+                    />
+                    {spotPrices && Number(troyOz) > 0 && (
+                      <p className="mt-1 text-xs text-zinc-500">
+                        ≈ {formatCurrency(Number(troyOz) * spotPrices[preciousMetal])} at{" "}
+                        {formatCurrency(spotPrices[preciousMetal])}/oz spot
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    Current balance
+                  </label>
+                  <input
+                    required
+                    type="number"
+                    step="0.01"
+                    value={balance}
+                    onChange={(e) => setBalance(e.target.value)}
+                    placeholder="Liabilities: enter a positive amount owed"
+                    className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
+                  />
+                </div>
+              )}
               <div className="mt-2 flex justify-end gap-2">
                 <button
                   type="button"

@@ -1,5 +1,6 @@
 import { getDB } from "@/lib/db";
 import { recomputeNetWorth } from "@/lib/sync";
+import { recomputeMetalAccountBalances } from "@/lib/spot-price";
 import { getNetWorthByClass } from "@/lib/queries";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { NetWorthByClassChart } from "@/components/net-worth-by-class-chart";
@@ -26,6 +27,7 @@ interface RecentTransaction {
 
 export default async function DashboardPage() {
   const db = await getDB();
+  await recomputeMetalAccountBalances(db);
   await recomputeNetWorth(db);
 
   const snapshotResult = await db

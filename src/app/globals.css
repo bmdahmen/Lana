@@ -20,6 +20,7 @@
   --chart-crypto: #4a3aa7;
   --chart-real-estate: #e34948;
   --chart-hard-asset: #e87ba4;
+  --chart-precious-metals: #5a8a1a;
   --chart-liabilities: #eb6834;
   --chart-other: #898781;
   --chart-grid: #e1e0d9;
@@ -37,6 +38,7 @@
     --chart-crypto: #9085e9;
     --chart-real-estate: #e66767;
     --chart-hard-asset: #d55181;
+    --chart-precious-metals: #6a9a2a;
     --chart-liabilities: #d95926;
     --chart-other: #898781;
     --chart-grid: #2c2c2a;
