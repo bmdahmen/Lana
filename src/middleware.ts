@@ -24,8 +24,7 @@ export async function middleware(request: NextRequest) {
     PUBLIC_PATHS.includes(pathname) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/plaid/webhook") ||
-    pathname.startsWith("/api/mx/webhook") ||
-    pathname.startsWith("/api/era/ingest")
+    pathname.startsWith("/api/mx/webhook")
   ) {
     return NextResponse.next();
   }

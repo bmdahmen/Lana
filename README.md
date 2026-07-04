@@ -62,7 +62,6 @@ Lana has no password — it uses [Google Identity Services](https://developers.g
 | `MX_CLIENT_ID` | From MX's partner dashboard — used for brokerages Plaid doesn't reach (Vanguard, Fidelity, Schwab, Robinhood investing). |
 | `MX_API_KEY` | Matching API key for your `MX_ENV`. |
 | `MX_ENV` | `sandbox` or `production`. Sandbox uses `int-api.mx.com`, production uses `api.mx.com`. |
-| `ERA_API_KEY` | API key from [Era](https://era.app) — used to pull accounts/transactions Era already has connected (e.g. Robinhood Banking/Credit Card) that neither Plaid nor MX can reach directly. |
 
 ## MX setup (Vanguard, Fidelity, Schwab, Robinhood investing)
 
@@ -88,60 +87,6 @@ Unlike Plaid, MX doesn't have a cursor-based sync — every sync just re-pulls t
 last ~120 days of transactions and upserts by MX's transaction GUID, so it's
 safe to call `/api/mx/sync` as often as you like.
 
-## Era setup (accounts Era already has connected)
-
-If you use [Era](https://era.app) as a personal finance assistant and it already
-has accounts connected (via its own aggregator relationships) that Lana can't
-reach through Plaid or MX — e.g. Robinhood Banking/Credit Card — Lana can pull
-that same data through Era's MCP-based API, read-only, for accounts that are
-actually yours.
-
-**This sync runs from GitHub Actions, not from Lana's own Worker.** Era's
-Cloudflare-fronted domain blocks requests that originate from Cloudflare
-Workers' network (their WAF treats it as datacenter/bot traffic and returns an
-empty 500 before Era's own app code ever runs) — verified by testing the exact
-same API key from a plain machine (works) vs. from the deployed Worker
-(blocked, consistently). So the actual Era API call happens in a scheduled
-GitHub Actions job instead, which then pushes the result to Lana over a
-small secured endpoint.
-
-Setup:
-
-1. Get an API key from Era (Settings → Developer/API in the Era dashboard).
-2. Generate a random secret for `ERA_SYNC_SECRET` (same idea as `SESSION_SECRET`
-   — used to authenticate the GitHub Action's requests to Lana, since it can't
-   use your Google session cookie).
-3. Set both as **Cloudflare Worker secrets**:
-   ```bash
-   npx wrangler secret put ERA_SYNC_SECRET
-   ```
-   (`ERA_API_KEY` does *not* need to be a Worker secret — the Worker itself
-   never calls Era.)
-4. Add three **GitHub repository secrets** (repo → Settings → Secrets and
-   variables → Actions):
-
-   | Secret | Value |
-   |---|---|
-   | `ERA_API_KEY` | Same key from step 1. |
-   | `LANA_URL` | Your deployed URL, e.g. `https://lana.bmdahmen.workers.dev` |
-   | `LANA_SYNC_SECRET` | Same value as `ERA_SYNC_SECRET` in step 3. |
-
-5. `.github/workflows/era-sync.yml` runs once a day automatically (matching
-   Era's Basic-tier `sync-cadence-hours` limit of 24 and its 100/period
-   `mcp-calls` budget), and can also be triggered on demand from the repo's
-   **Actions** tab (Run workflow).
-
-Two things worth knowing:
-
-- **Era's own plan limits can obfuscate balances.** If your Era plan caps
-  visible accounts, some accounts come back with no balance data at all — the
-  sync skips those rather than writing a false $0, so they simply won't appear
-  until your Era plan shows real numbers for them.
-- **Local `syncEraAccounts()` in `src/lib/era-sync.ts` won't work from the
-  deployed Worker** — it's kept for completeness (and would work fine called
-  from a non-Cloudflare environment), but production sync goes through
-  `/api/era/ingest` fed by the GitHub Actions job, not a direct in-Worker call.
-
 ## Database
 
 Schema lives in `migrations/*.sql`, applied in order. The Cloudflare D1 database
@@ -159,9 +104,6 @@ Schema lives in `migrations/*.sql`, applied in order. The Cloudflare D1 database
   new transactions are ready, which syncs that item immediately.
 - `/api/mx/sync` (POST) does the same for every MX-linked brokerage/bank member.
   MX pushes updates to `/api/mx/webhook` if you've registered one (see MX setup above).
-- Era syncs on a schedule via GitHub Actions (see Era setup above), which POSTs
-  to `/api/era/ingest`. Trigger it early from the repo's Actions tab if you
-  don't want to wait for the next 6-hour run.
 
 ## Deploying to Cloudflare
 
@@ -183,7 +125,6 @@ npx wrangler secret put PLAID_WEBHOOK_URL
 npx wrangler secret put MX_CLIENT_ID
 npx wrangler secret put MX_API_KEY
 npx wrangler secret put MX_ENV
-npx wrangler secret put ERA_SYNC_SECRET
 ```
 
 `NEXT_PUBLIC_GOOGLE_CLIENT_ID` is different: Next.js inlines `NEXT_PUBLIC_*`
