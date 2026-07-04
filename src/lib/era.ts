@@ -7,18 +7,20 @@ interface McpToolResponse {
   error?: { code: number; message: string };
 }
 
+let requestId = 0;
+
 async function callEraToolOnce<T>(apiKey: string, name: string, args: Record<string, unknown>): Promise<T> {
+  requestId += 1;
   const res = await fetch(ERA_MCP_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json, text/event-stream",
       Authorization: `Bearer ${apiKey}`,
-      "User-Agent": "Lana/1.0 (+https://lana.bmdahmen.workers.dev)",
     },
     body: JSON.stringify({
       jsonrpc: "2.0",
-      id: Date.now(),
+      id: requestId,
       method: "tools/call",
       params: { name, arguments: args },
     }),

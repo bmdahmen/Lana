@@ -19,18 +19,20 @@ function requireEnv(name) {
   return value;
 }
 
+let requestId = 0;
+
 async function callEraTool(name, args = {}) {
+  requestId += 1;
   const res = await fetch(ERA_MCP_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json, text/event-stream",
       Authorization: `Bearer ${ERA_API_KEY}`,
-      "User-Agent": "Lana-Sync/1.0 (+https://github.com/bmdahmen/Lana)",
     },
     body: JSON.stringify({
       jsonrpc: "2.0",
-      id: Date.now(),
+      id: requestId,
       method: "tools/call",
       params: { name, arguments: args },
     }),
