@@ -109,23 +109,27 @@ npm run cf:preview
 
 ## Auto-deploy on push
 
-`.github/workflows/deploy.yml` deploys to Cloudflare automatically on every push
-to `main` (and can be triggered manually from the Actions tab). It needs two
-repository secrets, set at **GitHub repo → Settings → Secrets and variables →
-Actions → New repository secret**:
+This repo is connected to Cloudflare's native Git integration ("Workers
+Builds"), under the Worker's **Settings → Builds** in the Cloudflare dashboard.
+It watches `main` and builds + deploys on every push — no GitHub Actions
+needed. Two settings matter there:
 
-| Secret | Value |
-|---|---|
-| `CLOUDFLARE_API_TOKEN` | An API token from https://dash.cloudflare.com/profile/api-tokens using the **"Edit Cloudflare Workers"** template. This is different from `wrangler login` (which only authenticates your own machine) — CI needs its own token. |
-| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Same value as in your `.env.local` — needed at build time to bake into the client bundle. |
+- **Build command** must be `npm run cf:build` — *not* `npm run build`. Plain
+  `next build` only produces Next's own `.next` output; it's `npm run cf:build`
+  (via the OpenNext adapter) that produces `.open-next/worker.js`, which is
+  what `wrangler deploy` actually ships. Using the wrong command means the
+  build either fails or deploys stale output.
+- **Build environment variables** must include `NEXT_PUBLIC_GOOGLE_CLIENT_ID`
+  (same value as your `.env.local`) — it's baked into the client bundle at
+  build time, so it has to be present there, not just as a Worker secret.
 
 Runtime secrets (`SESSION_SECRET`, `GOOGLE_ALLOWED_EMAIL`, `PLAID_CLIENT_ID`,
-`PLAID_SECRET`, `PLAID_ENV`) are already stored on the Worker itself via
-`wrangler secret put` — the CI job doesn't need them, since they're read from
-the Cloudflare runtime, not baked in at build time.
+`PLAID_SECRET`, `PLAID_ENV`) stay exactly as set via `wrangler secret put` —
+Cloudflare's builder reads those from the Worker itself, not from the build
+environment.
 
-Once both secrets are set, just `git push` to `main` and the deploy happens on
-its own — no more running `npm run cf:deploy` by hand.
+Once both are set correctly, `git push` to `main` is the entire deploy
+workflow — no manual `npm run cf:deploy` needed.
 
 ## Architecture notes
 
