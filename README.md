@@ -126,8 +126,10 @@ Setup:
    | `LANA_URL` | Your deployed URL, e.g. `https://lana.bmdahmen.workers.dev` |
    | `LANA_SYNC_SECRET` | Same value as `ERA_SYNC_SECRET` in step 3. |
 
-5. `.github/workflows/era-sync.yml` runs every 6 hours automatically, and can
-   also be triggered on demand from the repo's **Actions** tab (Run workflow).
+5. `.github/workflows/era-sync.yml` runs once a day automatically (matching
+   Era's Basic-tier `sync-cadence-hours` limit of 24 and its 100/period
+   `mcp-calls` budget), and can also be triggered on demand from the repo's
+   **Actions** tab (Run workflow).
 
 Two things worth knowing:
 
