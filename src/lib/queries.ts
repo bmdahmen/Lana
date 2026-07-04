@@ -16,6 +16,7 @@ export async function getNetWorthByClass(
        FROM account_balance_history abh
        JOIN account a ON a.id = abh.account_id
        WHERE a.is_closed = 0 AND a.is_hidden = 0
+         AND (a.relevant_until IS NULL OR abh.date <= a.relevant_until)
        GROUP BY abh.date, a.asset_class
        ORDER BY abh.date ASC`
     )
