@@ -80,14 +80,14 @@ export function RulesTable({
     <div className="flex flex-col gap-6">
       <form
         onSubmit={createRule}
-        className="flex flex-wrap items-end gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950"
+        className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 sm:flex-row sm:flex-wrap sm:items-end dark:border-zinc-800 dark:bg-zinc-950"
       >
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-zinc-500">If</label>
           <select
             value={matchField}
             onChange={(e) => setMatchField(e.target.value as Rule["match_field"])}
-            className="rounded-md border border-zinc-300 px-2 py-2 text-sm outline-none dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-full rounded-md border border-zinc-300 px-2 py-2 text-sm outline-none sm:w-auto dark:border-zinc-700 dark:bg-zinc-900"
           >
             <option value="name">description</option>
             <option value="merchant_name">merchant name</option>
@@ -98,7 +98,7 @@ export function RulesTable({
           <select
             value={matchType}
             onChange={(e) => setMatchType(e.target.value as Rule["match_type"])}
-            className="rounded-md border border-zinc-300 px-2 py-2 text-sm outline-none dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-full rounded-md border border-zinc-300 px-2 py-2 text-sm outline-none sm:w-auto dark:border-zinc-700 dark:bg-zinc-900"
           >
             <option value="contains">contains</option>
             <option value="equals">equals</option>
@@ -110,7 +110,7 @@ export function RulesTable({
             value={matchValue}
             onChange={(e) => setMatchValue(e.target.value)}
             placeholder="e.g. CHASE CREDIT CRD PAYMENT"
-            className="w-64 rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 sm:w-64 dark:border-zinc-700 dark:bg-zinc-900"
           />
         </div>
         <div className="flex flex-col gap-1">
@@ -118,7 +118,7 @@ export function RulesTable({
           <select
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value)}
-            className="rounded-md border border-zinc-300 px-2 py-2 text-sm outline-none dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-full rounded-md border border-zinc-300 px-2 py-2 text-sm outline-none sm:w-auto dark:border-zinc-700 dark:bg-zinc-900"
           >
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
@@ -136,51 +136,81 @@ export function RulesTable({
         </button>
       </form>
 
-      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-        <table className="w-full text-sm">
-          <thead className="border-b border-zinc-200 bg-zinc-50 text-left text-xs font-medium uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900">
-            <tr>
-              <th className="px-4 py-3">If</th>
-              <th className="px-4 py-3">Value</th>
-              <th className="px-4 py-3">Category</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-100 dark:divide-zinc-900">
-            {rules.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-zinc-500">
-                  No rules yet. Add one above.
-                </td>
-              </tr>
-            )}
+      {rules.length === 0 ? (
+        <p className="rounded-xl border border-zinc-200 bg-white py-8 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950">
+          No rules yet. Add one above.
+        </p>
+      ) : (
+        <>
+          {/* Mobile: card list */}
+          <ul className="flex flex-col gap-3 md:hidden">
             {rules.map((rule) => (
-              <tr key={rule.id}>
-                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
-                  {rule.match_field === "merchant_name" ? "merchant name" : "description"}{" "}
-                  {rule.match_type}
-                </td>
-                <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-50">
-                  {rule.match_value}
-                </td>
-                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
-                  {rule.category_icon} {rule.category_name}
-                </td>
-                <td className="px-4 py-3 text-right">
+              <li
+                key={rule.id}
+                className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                      {rule.match_value}
+                    </p>
+                    <p className="mt-0.5 text-xs text-zinc-500">
+                      {rule.match_field === "merchant_name" ? "merchant name" : "description"}{" "}
+                      {rule.match_type} → {rule.category_icon} {rule.category_name}
+                    </p>
+                  </div>
                   <button
                     onClick={() => deleteRule(rule.id)}
-                    className="text-xs text-red-500 hover:text-red-700"
+                    className="shrink-0 text-xs text-red-500 hover:text-red-700"
                   >
                     Delete
                   </button>
-                </td>
-              </tr>
+                </div>
+              </li>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </ul>
 
-      <div className="flex items-center gap-3">
+          {/* Desktop: table */}
+          <div className="hidden overflow-hidden rounded-xl border border-zinc-200 bg-white md:block dark:border-zinc-800 dark:bg-zinc-950">
+            <table className="w-full text-sm">
+              <thead className="border-b border-zinc-200 bg-zinc-50 text-left text-xs font-medium uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900">
+                <tr>
+                  <th className="px-4 py-3">If</th>
+                  <th className="px-4 py-3">Value</th>
+                  <th className="px-4 py-3">Category</th>
+                  <th className="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-900">
+                {rules.map((rule) => (
+                  <tr key={rule.id}>
+                    <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                      {rule.match_field === "merchant_name" ? "merchant name" : "description"}{" "}
+                      {rule.match_type}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-50">
+                      {rule.match_value}
+                    </td>
+                    <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                      {rule.category_icon} {rule.category_name}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => deleteRule(rule.id)}
+                        className="text-xs text-red-500 hover:text-red-700"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
         <button
           onClick={applyToExisting}
           disabled={submitting || rules.length === 0}

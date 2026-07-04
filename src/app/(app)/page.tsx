@@ -1,19 +1,14 @@
+import Link from "next/link";
 import { getDB } from "@/lib/db";
 import { recomputeNetWorth } from "@/lib/sync";
 import { recomputeMetalAccountBalances } from "@/lib/spot-price";
 import { recomputeRealEstateAccountBalances } from "@/lib/zillow";
 import { getNetWorthByClass } from "@/lib/queries";
+import { ASSET_CLASSES } from "@/lib/asset-classes";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { NetWorthByClassChart } from "@/components/net-worth-by-class-chart";
-import { LinkAccountButton } from "@/components/link-account-button";
-import { LinkMxAccountButton } from "@/components/link-mx-account-button";
+import { NetWorthHero } from "@/components/net-worth-hero";
 
-interface Snapshot {
-  date: string;
-  total_assets: number;
-  total_liabilities: number;
-  net_worth: number;
-}
+const HERO_DEFAULT_DAYS = 365;
 
 interface RecentTransaction {
   id: string;
@@ -32,16 +27,8 @@ export default async function DashboardPage() {
   await recomputeRealEstateAccountBalances(db);
   await recomputeNetWorth(db);
 
-  const snapshotResult = await db
-    .prepare(
-      `SELECT date, total_assets, total_liabilities, net_worth
-       FROM net_worth_snapshot ORDER BY date DESC LIMIT 90`
-    )
-    .all<Snapshot>();
-  const snapshots = (snapshotResult.results ?? []).slice().reverse();
-  const latest = snapshots[snapshots.length - 1];
-
-  const byClassPoints = await getNetWorthByClass(db, 90);
+  const byClassPoints = await getNetWorthByClass(db, HERO_DEFAULT_DAYS);
+  const latest = byClassPoints[byClassPoints.length - 1];
 
   const accountCount = await db
     .prepare("SELECT COUNT(*) as count FROM account WHERE is_closed = 0")
@@ -60,86 +47,101 @@ export default async function DashboardPage() {
     .all<RecentTransaction>();
   const recentTransactions = recentResult.results ?? [];
 
+  const classBreakdown = latest
+    ? ASSET_CLASSES.filter((cls) => Number(latest[cls.id] ?? 0) !== 0).map((cls) => ({
+        ...cls,
+        value: Number(latest[cls.id] ?? 0),
+      }))
+    : [];
+
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Dashboard</h1>
-        <div className="flex gap-2">
-          <LinkAccountButton />
-          <LinkMxAccountButton />
-        </div>
-      </div>
+    <div className="mx-auto flex max-w-2xl flex-col">
+      <header className="flex items-center justify-between px-4 pt-6 pb-2 sm:px-8 md:hidden">
+        <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Lana</span>
+        <Link
+          href="/accounts"
+          aria-label="Add account"
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 text-zinc-500 dark:border-zinc-800 dark:text-zinc-400"
+        >
+          +
+        </Link>
+      </header>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <SummaryCard label="Net Worth" value={latest?.net_worth ?? 0} />
-        <SummaryCard label="Assets" value={latest?.total_assets ?? 0} />
-        <SummaryCard label="Liabilities" value={latest?.total_liabilities ?? 0} negative />
-      </div>
+      <section className="px-4 pt-4 pb-6 sm:px-8">
+        <NetWorthHero initialPoints={byClassPoints} initialDays={HERO_DEFAULT_DAYS} />
+      </section>
 
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
-        <h2 className="mb-4 text-sm font-medium text-zinc-500">Net Worth by Category</h2>
-        <NetWorthByClassChart points={byClassPoints} />
-      </div>
-
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
-        <h2 className="mb-4 text-sm font-medium text-zinc-500">Recent Transactions</h2>
-        {recentTransactions.length === 0 ? (
-          <EmptyState accountCount={accountCount?.count ?? 0} />
-        ) : (
-          <ul className="flex flex-col divide-y divide-zinc-100 dark:divide-zinc-900">
-            {recentTransactions.map((tx) => (
-              <li key={tx.id} className="flex items-center justify-between py-3">
-                <div className="flex items-center gap-3">
-                  <span className="text-lg">{tx.category_icon ?? "❔"}</span>
-                  <div>
-                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                      {tx.merchant_name ?? tx.name}
-                    </p>
-                    <p className="text-xs text-zinc-500">
-                      {tx.account_name} · {formatDate(tx.date)}
-                    </p>
-                  </div>
-                </div>
-                <span
-                  className={
-                    tx.amount > 0
-                      ? "text-sm font-medium text-zinc-900 dark:text-zinc-50"
-                      : "text-sm font-medium text-emerald-600"
-                  }
-                >
-                  {tx.amount > 0 ? "-" : "+"}
-                  {formatCurrency(Math.abs(tx.amount))}
+      {classBreakdown.length > 0 && (
+        <section className="pb-6">
+          <h2 className="mb-3 px-4 text-sm font-medium text-zinc-500 sm:px-8">By category</h2>
+          <div className="no-scrollbar flex gap-3 overflow-x-auto px-4 sm:px-8">
+            {classBreakdown.map((cls) => (
+              <Link
+                key={cls.id}
+                href="/net-worth"
+                className="flex min-w-[132px] shrink-0 flex-col gap-2 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950"
+              >
+                <span className="flex items-center gap-2 text-xs font-medium text-zinc-500">
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: `var(${cls.colorVar})` }}
+                  />
+                  {cls.label}
                 </span>
-              </li>
+                <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                  {formatCurrency(cls.value)}
+                </span>
+              </Link>
             ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
-}
+          </div>
+        </section>
+      )}
 
-function SummaryCard({
-  label,
-  value,
-  negative,
-}: {
-  label: string;
-  value: number;
-  negative?: boolean;
-}) {
-  return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
-      <p className="text-sm text-zinc-500">{label}</p>
-      <p
-        className={
-          negative
-            ? "mt-1 text-2xl font-semibold text-red-600"
-            : "mt-1 text-2xl font-semibold text-zinc-900 dark:text-zinc-50"
-        }
-      >
-        {formatCurrency(value)}
-      </p>
+      <section className="px-4 pb-8 sm:px-8">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-medium text-zinc-500">Recent Activity</h2>
+          <Link
+            href="/transactions"
+            className="text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50"
+          >
+            See all
+          </Link>
+        </div>
+        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+          {recentTransactions.length === 0 ? (
+            <EmptyState accountCount={accountCount?.count ?? 0} />
+          ) : (
+            <ul className="flex flex-col divide-y divide-zinc-100 dark:divide-zinc-900">
+              {recentTransactions.map((tx) => (
+                <li key={tx.id} className="flex items-center justify-between px-4 py-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="text-lg">{tx.category_icon ?? "❔"}</span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                        {tx.merchant_name ?? tx.name}
+                      </p>
+                      <p className="truncate text-xs text-zinc-500">
+                        {tx.account_name} · {formatDate(tx.date)}
+                      </p>
+                    </div>
+                  </div>
+                  <span
+                    className={
+                      tx.amount > 0
+                        ? "shrink-0 pl-2 text-sm font-medium text-zinc-900 dark:text-zinc-50"
+                        : "shrink-0 pl-2 text-sm font-medium"
+                    }
+                    style={tx.amount > 0 ? undefined : { color: "var(--positive)" }}
+                  >
+                    {tx.amount > 0 ? "-" : "+"}
+                    {formatCurrency(Math.abs(tx.amount))}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
@@ -147,9 +149,17 @@ function SummaryCard({
 function EmptyState({ accountCount }: { accountCount: number }) {
   return (
     <p className="py-8 text-center text-sm text-zinc-500">
-      {accountCount === 0
-        ? "Link your first account to start tracking your finances."
-        : "No transactions yet — they'll show up here after your first sync."}
+      {accountCount === 0 ? (
+        <>
+          Link your first account from{" "}
+          <Link href="/accounts" className="underline underline-offset-2">
+            Accounts
+          </Link>{" "}
+          to start tracking your finances.
+        </>
+      ) : (
+        "No transactions yet — they'll show up here after your first sync."
+      )}
     </p>
   );
 }

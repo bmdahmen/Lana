@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // The bottom-left dev indicator collides with the mobile bottom tab bar.
+  devIndicators: {
+    position: "top-right",
+  },
 };
 
 export default nextConfig;

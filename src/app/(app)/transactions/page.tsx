@@ -14,7 +14,7 @@ export default async function TransactionsPage() {
     .all<Category>();
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
       <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Transactions</h1>
       <TransactionsTable categories={categoriesResult.results ?? []} />
     </div>

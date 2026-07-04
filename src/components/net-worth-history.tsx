@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import clsx from "clsx";
 import { NetWorthByClassChart } from "@/components/net-worth-by-class-chart";
+import { ASSET_CLASSES } from "@/lib/asset-classes";
+import { formatCurrency } from "@/lib/format";
 import type { NetWorthByClassPoint } from "@/lib/queries";
 
 const RANGES: { label: string; days: number }[] = [
@@ -34,15 +36,22 @@ export function NetWorthHistory({
     return () => clearTimeout(timeout);
   }, [days, initialDays, load]);
 
+  const latest = points[points.length - 1];
+  const legend = latest
+    ? ASSET_CLASSES.filter((cls) => Number(latest[cls.id] ?? 0) !== 0)
+        .map((cls) => ({ ...cls, value: Number(latest[cls.id] ?? 0) }))
+        .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
+    : [];
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex justify-end gap-1">
+      <div className="flex gap-1">
         {RANGES.map((r) => (
           <button
             key={r.label}
             onClick={() => setDays(r.days)}
             className={clsx(
-              "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+              "flex-1 rounded-full py-1.5 text-xs font-semibold transition-colors sm:flex-none sm:px-4",
               days === r.days
                 ? "bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900"
                 : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"
@@ -53,6 +62,24 @@ export function NetWorthHistory({
         ))}
       </div>
       <NetWorthByClassChart points={points} />
+      {legend.length > 0 && (
+        <ul className="flex flex-col divide-y divide-zinc-100 dark:divide-zinc-900">
+          {legend.map((cls) => (
+            <li key={cls.id} className="flex items-center justify-between py-2.5 text-sm">
+              <span className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: `var(${cls.colorVar})` }}
+                />
+                {cls.label}
+              </span>
+              <span className="font-medium text-zinc-900 dark:text-zinc-50">
+                {formatCurrency(cls.value)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

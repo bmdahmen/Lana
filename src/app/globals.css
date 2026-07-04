@@ -1,8 +1,12 @@
 @import "tailwindcss";
 
+/* Dark is the app's only theme (Robinhood-style black background), so drive
+   the `dark:` variant off a permanent class instead of OS preference. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 @theme inline {
@@ -13,41 +17,40 @@
 }
 
 :root {
-  --chart-net-worth: #2a78d6;
-  --chart-cash: #1baf7a;
-  --chart-brokerage: #eda100;
+  --chart-net-worth: #3987e5;
+  --chart-cash: #199e70;
+  --chart-brokerage: #c98500;
   --chart-retirement: #008300;
-  --chart-crypto: #4a3aa7;
-  --chart-real-estate: #e34948;
-  --chart-hard-asset: #e87ba4;
-  --chart-precious-metals: #5a8a1a;
-  --chart-liabilities: #eb6834;
+  --chart-crypto: #9085e9;
+  --chart-real-estate: #e66767;
+  --chart-hard-asset: #d55181;
+  --chart-precious-metals: #6a9a2a;
+  --chart-liabilities: #d95926;
   --chart-other: #898781;
-  --chart-grid: #e1e0d9;
-  --chart-axis: #c3c2b7;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --chart-net-worth: #3987e5;
-    --chart-cash: #199e70;
-    --chart-brokerage: #c98500;
-    --chart-retirement: #008300;
-    --chart-crypto: #9085e9;
-    --chart-real-estate: #e66767;
-    --chart-hard-asset: #d55181;
-    --chart-precious-metals: #6a9a2a;
-    --chart-liabilities: #d95926;
-    --chart-other: #898781;
-    --chart-grid: #2c2c2a;
-    --chart-axis: #383835;
-  }
+  --chart-grid: #2c2c2a;
+  --chart-axis: #383835;
+  --positive: #00d97e;
+  --positive-fill: rgba(0, 217, 126, 0.12);
+  --negative: #ff5b4a;
+  --negative-fill: rgba(255, 91, 74, 0.12);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Hide scrollbar on horizontally-scrolling mobile rows while keeping them scrollable */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
 }

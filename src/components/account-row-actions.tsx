@@ -42,7 +42,7 @@ export function AccountRowActions({
   }
 
   return (
-    <div className="flex justify-end gap-3 text-xs">
+    <div className="flex flex-wrap justify-end gap-3 text-xs">
       <button
         disabled={submitting}
         onClick={() => patch({ isHidden: !isHidden })}

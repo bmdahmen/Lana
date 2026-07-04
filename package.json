@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "cf:types": "wrangler types",
-    "dev": "npm run cf:types && next dev",
+    "dev": "npm run cf:types && next dev --webpack",
     "build": "npm run cf:types && next build --webpack",
     "start": "next start",
     "lint": "eslint",
