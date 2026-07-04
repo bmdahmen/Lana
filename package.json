@@ -3,13 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "cf:types": "wrangler types",
+    "dev": "npm run cf:types && next dev",
+    "build": "npm run cf:types && next build",
     "start": "next start",
     "lint": "eslint",
-    "cf:build": "opennextjs-cloudflare build",
-    "cf:preview": "opennextjs-cloudflare build && wrangler dev",
-    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf:build": "npm run cf:types && opennextjs-cloudflare build",
+    "cf:preview": "npm run cf:types && opennextjs-cloudflare build && wrangler dev",
+    "cf:deploy": "npm run cf:types && opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "db:migrate:local": "bash scripts/migrate.sh --local",
     "db:migrate:remote": "bash scripts/migrate.sh --remote"
   },
@@ -25,7 +26,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260702.1",
     "@opennextjs/cloudflare": "^1.20.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
