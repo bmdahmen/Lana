@@ -28,18 +28,24 @@ export async function getNetWorthByClass(
     byDate.set(row.date, bucket);
   }
 
-  const dates = [...byDate.keys()].sort().slice(-days);
+  const dates = [...byDate.keys()].sort();
+  const lastKnown: Partial<Record<AssetClass, number>> = {};
 
-  return dates.map((date) => {
+  const points = dates.map((date) => {
     const bucket = byDate.get(date)!;
     const point: NetWorthByClassPoint = { date, net_worth: 0 };
     let netWorth = 0;
     for (const { id } of ASSET_CLASSES) {
-      const value = bucket[id] ?? 0;
+      // Carry forward the last known total when a class has no row for this
+      // date (e.g. its account stopped syncing) instead of dropping to zero.
+      const value = bucket[id] ?? lastKnown[id] ?? 0;
+      lastKnown[id] = value;
       point[id] = value;
       netWorth += id === "liabilities" ? -value : value;
     }
     point.net_worth = netWorth;
     return point;
   });
+
+  return points.slice(-days);
 }

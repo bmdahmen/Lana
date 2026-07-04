@@ -130,8 +130,11 @@ export async function recomputeNetWorth(db: D1Database): Promise<void> {
 
   const accounts = await db
     .prepare(
-      "SELECT id, current_balance, is_asset FROM account WHERE is_closed = 0 AND is_hidden = 0"
+      `SELECT id, current_balance, is_asset FROM account
+       WHERE is_closed = 0 AND is_hidden = 0
+         AND (relevant_until IS NULL OR relevant_until >= ?)`
     )
+    .bind(today)
     .all<{ id: string; current_balance: number | null; is_asset: number }>();
 
   let totalAssets = 0;

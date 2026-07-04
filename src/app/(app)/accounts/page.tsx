@@ -1,5 +1,5 @@
 import { getDB } from "@/lib/db";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
 import { ASSET_CLASSES, type PreciousMetal } from "@/lib/asset-classes";
 import { recomputeMetalAccountBalances } from "@/lib/spot-price";
 import { AddManualAccountButton } from "@/components/add-manual-account-button";
@@ -20,6 +20,8 @@ interface AccountRow {
   item_status: string | null;
   precious_metal: PreciousMetal | null;
   metal_troy_oz: number | null;
+  relevant_from: string | null;
+  relevant_until: string | null;
 }
 
 const CLASS_LABEL = new Map<string, string>(ASSET_CLASSES.map((c) => [c.id, c.label]));
@@ -31,7 +33,7 @@ export default async function AccountsPage() {
     .prepare(
       `SELECT a.id, a.name, a.official_name, a.mask, a.current_balance, a.is_manual, a.is_hidden,
               a.asset_class, p.institution_name, p.status as item_status,
-              a.precious_metal, a.metal_troy_oz
+              a.precious_metal, a.metal_troy_oz, a.relevant_from, a.relevant_until
        FROM account a
        LEFT JOIN plaid_item p ON p.id = a.plaid_item_id
        WHERE a.is_closed = 0
@@ -76,6 +78,13 @@ export default async function AccountsPage() {
                         {acc.metal_troy_oz} troy oz {acc.precious_metal}
                       </p>
                     )}
+                    {acc.relevant_until && (
+                      <p className="mt-0.5 inline-flex items-center rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500 dark:bg-zinc-900">
+                        Historical: {acc.relevant_from ? formatDate(acc.relevant_from) : "—"}
+                        {" – "}
+                        {formatDate(acc.relevant_until)}
+                      </p>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                     {CLASS_LABEL.get(acc.asset_class) ?? acc.asset_class}
@@ -97,6 +106,7 @@ export default async function AccountsPage() {
                       isHidden={!!acc.is_hidden}
                       isManual={!!acc.is_manual}
                       preciousMetal={acc.precious_metal}
+                      isHistorical={!!acc.relevant_until}
                     />
                   </td>
                 </tr>

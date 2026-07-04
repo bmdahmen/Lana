@@ -9,11 +9,13 @@ export function AccountRowActions({
   isHidden,
   isManual,
   preciousMetal,
+  isHistorical,
 }: {
   accountId: string;
   isHidden: boolean;
   isManual: boolean;
   preciousMetal?: PreciousMetal | null;
+  isHistorical?: boolean;
 }) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
@@ -67,6 +69,27 @@ export function AccountRowActions({
           className="text-zinc-500 hover:text-zinc-900 disabled:opacity-50 dark:hover:text-zinc-50"
         >
           Update balance
+        </button>
+      )}
+      {isManual && (
+        <button
+          disabled={submitting}
+          onClick={() => {
+            if (isHistorical) {
+              patch({ relevantUntil: null, relevantFrom: null });
+              return;
+            }
+            if (
+              confirm(
+                "Mark historical? Its balance history stays in the net worth chart, but it stops counting toward today's totals -- use this instead of Close when a real linked account now covers the same category."
+              )
+            ) {
+              patch({ relevantUntil: new Date().toISOString().slice(0, 10) });
+            }
+          }}
+          className="text-zinc-500 hover:text-zinc-900 disabled:opacity-50 dark:hover:text-zinc-50"
+        >
+          {isHistorical ? "Clear historical" : "Mark historical"}
         </button>
       )}
       <button

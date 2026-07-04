@@ -11,6 +11,8 @@ const updateSchema = z.object({
   isClosed: z.boolean().optional(),
   currentBalance: z.number().optional(),
   metalTroyOz: z.number().positive().optional(),
+  relevantFrom: z.string().nullable().optional(),
+  relevantUntil: z.string().nullable().optional(),
   assetClass: z
     .enum([
       "cash",
@@ -71,6 +73,14 @@ export async function PATCH(
   if (body.data.assetClass !== undefined) {
     updates.push("asset_class = ?", "is_asset = ?");
     bindings.push(body.data.assetClass, isAssetClassLiability(body.data.assetClass) ? 0 : 1);
+  }
+  if (body.data.relevantFrom !== undefined) {
+    updates.push("relevant_from = ?");
+    bindings.push(body.data.relevantFrom);
+  }
+  if (body.data.relevantUntil !== undefined) {
+    updates.push("relevant_until = ?");
+    bindings.push(body.data.relevantUntil);
   }
 
   if (updates.length > 0) {
