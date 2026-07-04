@@ -5,7 +5,7 @@
   "scripts": {
     "cf:types": "wrangler types",
     "dev": "npm run cf:types && next dev",
-    "build": "npm run cf:types && next build",
+    "build": "npm run cf:types && next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "cf:build": "npm run cf:types && opennextjs-cloudflare build",
