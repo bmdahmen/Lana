@@ -4,6 +4,7 @@ import { getDB } from "@/lib/db";
 import { recomputeNetWorth } from "@/lib/sync";
 import { isAssetClassLiability } from "@/lib/asset-classes";
 import { getSpotPrices } from "@/lib/spot-price";
+import { fetchZestimate } from "@/lib/zillow";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -13,6 +14,7 @@ const updateSchema = z.object({
   metalTroyOz: z.number().positive().optional(),
   relevantFrom: z.string().nullable().optional(),
   relevantUntil: z.string().nullable().optional(),
+  propertyAddress: z.string().min(1).optional(),
   assetClass: z
     .enum([
       "cash",
@@ -69,6 +71,23 @@ export async function PATCH(
     const prices = await getSpotPrices(db);
     updates.push("metal_troy_oz = ?", "current_balance = ?");
     bindings.push(body.data.metalTroyOz, body.data.metalTroyOz * prices[account.precious_metal]);
+  }
+  if (body.data.propertyAddress !== undefined) {
+    const account = await db
+      .prepare("SELECT asset_class FROM account WHERE id = ?")
+      .bind(id)
+      .first<{ asset_class: string }>();
+    if (account?.asset_class !== "real_estate") {
+      return NextResponse.json({ error: "Account is not a real estate account" }, { status: 400 });
+    }
+    let value: number;
+    try {
+      value = await fetchZestimate(body.data.propertyAddress);
+    } catch (error) {
+      return NextResponse.json({ error: (error as Error).message }, { status: 400 });
+    }
+    updates.push("property_address = ?", "current_balance = ?", "zestimate_updated_at = ?");
+    bindings.push(body.data.propertyAddress, value, Date.now());
   }
   if (body.data.assetClass !== undefined) {
     updates.push("asset_class = ?", "is_asset = ?");

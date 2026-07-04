@@ -14,9 +14,12 @@ export function AddManualAccountButton() {
   const [preciousMetal, setPreciousMetal] = useState<PreciousMetal>("gold");
   const [troyOz, setTroyOz] = useState("");
   const [spotPrices, setSpotPrices] = useState<Record<PreciousMetal, number> | null>(null);
+  const [propertyAddress, setPropertyAddress] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const isPreciousMetal = assetClass === "precious_metals";
+  const isRealEstate = assetClass === "real_estate";
 
   useEffect(() => {
     if (!isPreciousMetal || spotPrices) return;
@@ -29,20 +32,28 @@ export function AddManualAccountButton() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
+    setError(null);
     try {
-      await fetch("/api/accounts", {
+      const body = isPreciousMetal
+        ? { name, assetClass, preciousMetal, metalTroyOz: Number(troyOz) }
+        : isRealEstate
+          ? { name, assetClass, propertyAddress }
+          : { name, assetClass, currentBalance: Number(balance) };
+      const res = await fetch("/api/accounts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          isPreciousMetal
-            ? { name, assetClass, preciousMetal, metalTroyOz: Number(troyOz) }
-            : { name, assetClass, currentBalance: Number(balance) }
-        ),
+        body: JSON.stringify(body),
       });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        setError(data?.error ?? "Failed to add account");
+        return;
+      }
       setOpen(false);
       setName("");
       setBalance("");
       setTroyOz("");
+      setPropertyAddress("");
       router.refresh();
     } finally {
       setSubmitting(false);
@@ -132,6 +143,22 @@ export function AddManualAccountButton() {
                     )}
                   </div>
                 </>
+              ) : isRealEstate ? (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    Property address
+                  </label>
+                  <input
+                    required
+                    value={propertyAddress}
+                    onChange={(e) => setPropertyAddress(e.target.value)}
+                    placeholder="e.g. 1600 Pennsylvania Ave NW, Washington, DC 20500"
+                    className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
+                  />
+                  <p className="mt-1 text-xs text-zinc-500">
+                    The balance is set from Zillow&apos;s Zestimate for this address and refreshes automatically.
+                  </p>
+                </div>
               ) : (
                 <div>
                   <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -148,10 +175,14 @@ export function AddManualAccountButton() {
                   />
                 </div>
               )}
+              {error && <p className="text-sm text-red-600">{error}</p>}
               <div className="mt-2 flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setOpen(false)}
+                  onClick={() => {
+                    setOpen(false);
+                    setError(null);
+                  }}
                   className="rounded-md px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
                 >
                   Cancel

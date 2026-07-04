@@ -10,12 +10,14 @@ export function AccountRowActions({
   isManual,
   preciousMetal,
   isHistorical,
+  propertyAddress,
 }: {
   accountId: string;
   isHidden: boolean;
   isManual: boolean;
   preciousMetal?: PreciousMetal | null;
   isHistorical?: boolean;
+  propertyAddress?: string | null;
 }) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
@@ -23,11 +25,16 @@ export function AccountRowActions({
   async function patch(body: Record<string, unknown>) {
     setSubmitting(true);
     try {
-      await fetch(`/api/accounts/${accountId}`, {
+      const res = await fetch(`/api/accounts/${accountId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        alert(data?.error ?? "Update failed");
+        return;
+      }
       router.refresh();
     } finally {
       setSubmitting(false);
@@ -57,7 +64,21 @@ export function AccountRowActions({
           Update ounces
         </button>
       )}
-      {isManual && !preciousMetal && (
+      {isManual && propertyAddress !== undefined && propertyAddress !== null && (
+        <button
+          disabled={submitting}
+          onClick={() => {
+            const value = prompt("Property address", propertyAddress);
+            if (value !== null && value.trim() !== "") {
+              patch({ propertyAddress: value.trim() });
+            }
+          }}
+          className="text-zinc-500 hover:text-zinc-900 disabled:opacity-50 dark:hover:text-zinc-50"
+        >
+          Update address
+        </button>
+      )}
+      {isManual && !preciousMetal && !propertyAddress && (
         <button
           disabled={submitting}
           onClick={() => {

@@ -4,6 +4,7 @@ import { getDB, newId } from "@/lib/db";
 import { recomputeNetWorth } from "@/lib/sync";
 import { isAssetClassLiability, PRECIOUS_METALS } from "@/lib/asset-classes";
 import { getSpotPrices } from "@/lib/spot-price";
+import { fetchZestimate } from "@/lib/zillow";
 
 export async function GET() {
   const db = await getDB();
@@ -37,12 +38,18 @@ const createSchema = z
     currentBalance: z.number().optional(),
     preciousMetal: z.enum(PRECIOUS_METALS).optional(),
     metalTroyOz: z.number().positive().optional(),
+    propertyAddress: z.string().min(1).optional(),
   })
   .refine(
-    (data) =>
-      data.assetClass === "precious_metals"
-        ? data.preciousMetal !== undefined && data.metalTroyOz !== undefined
-        : data.currentBalance !== undefined,
+    (data) => {
+      if (data.assetClass === "precious_metals") {
+        return data.preciousMetal !== undefined && data.metalTroyOz !== undefined;
+      }
+      if (data.assetClass === "real_estate") {
+        return data.propertyAddress !== undefined;
+      }
+      return data.currentBalance !== undefined;
+    },
     { message: "Missing required fields for this account type" }
   );
 
@@ -57,17 +64,26 @@ export async function POST(request: Request) {
   const isAsset = !isAssetClassLiability(body.data.assetClass);
 
   let currentBalance = body.data.currentBalance ?? 0;
+  let zestimateUpdatedAt: number | null = null;
   if (body.data.assetClass === "precious_metals" && body.data.preciousMetal && body.data.metalTroyOz) {
     const prices = await getSpotPrices(db);
     currentBalance = body.data.metalTroyOz * prices[body.data.preciousMetal];
+  }
+  if (body.data.assetClass === "real_estate" && body.data.propertyAddress) {
+    try {
+      currentBalance = await fetchZestimate(body.data.propertyAddress);
+      zestimateUpdatedAt = Date.now();
+    } catch (error) {
+      return NextResponse.json({ error: (error as Error).message }, { status: 400 });
+    }
   }
 
   await db
     .prepare(
       `INSERT INTO account (
          id, name, type, current_balance, is_manual, is_asset, asset_class,
-         precious_metal, metal_troy_oz
-       ) VALUES (?, ?, 'other', ?, 1, ?, ?, ?, ?)`
+         precious_metal, metal_troy_oz, property_address, zestimate_updated_at
+       ) VALUES (?, ?, 'other', ?, 1, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       id,
@@ -76,7 +92,9 @@ export async function POST(request: Request) {
       isAsset ? 1 : 0,
       body.data.assetClass,
       body.data.preciousMetal ?? null,
-      body.data.metalTroyOz ?? null
+      body.data.metalTroyOz ?? null,
+      body.data.propertyAddress ?? null,
+      zestimateUpdatedAt
     )
     .run();
 
