@@ -33,7 +33,7 @@ export default async function RulesPage() {
   ]);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
       <div>
         <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Rules</h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">

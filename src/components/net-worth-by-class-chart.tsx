@@ -6,12 +6,11 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  Legend,
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
 import { ASSET_CLASSES } from "@/lib/asset-classes";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCompactCurrency, formatCurrency, formatDate } from "@/lib/format";
 import type { NetWorthByClassPoint } from "@/lib/queries";
 
 export function NetWorthByClassChart({ points }: { points: NetWorthByClassPoint[] }) {
@@ -28,27 +27,27 @@ export function NetWorthByClassChart({ points }: { points: NetWorthByClassPoint[
   );
 
   return (
-    <ResponsiveContainer width="100%" height={320}>
-      <LineChart data={points}>
+    <ResponsiveContainer width="100%" height={280}>
+      <LineChart data={points} margin={{ left: -16, right: 8 }}>
         <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
         <XAxis
           dataKey="date"
           tickFormatter={(d: string) => formatDate(d)}
-          tick={{ fontSize: 12, fill: "var(--chart-axis)" }}
+          tick={{ fontSize: 11, fill: "var(--chart-axis)" }}
           minTickGap={40}
           stroke="var(--chart-axis)"
         />
         <YAxis
-          tickFormatter={(v: number) => formatCurrency(v).replace(".00", "")}
-          tick={{ fontSize: 12, fill: "var(--chart-axis)" }}
-          width={80}
+          tickFormatter={(v: number) => formatCompactCurrency(v)}
+          tick={{ fontSize: 11, fill: "var(--chart-axis)" }}
+          width={48}
           stroke="var(--chart-axis)"
         />
         <Tooltip
           formatter={(value, name) => [formatCurrency(Number(value)), name]}
           labelFormatter={(label) => formatDate(String(label))}
+          contentStyle={{ fontSize: 12, borderRadius: 8 }}
         />
-        <Legend wrapperStyle={{ fontSize: 12 }} />
         <Line
           type="monotone"
           dataKey="net_worth"
