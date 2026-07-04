@@ -10,6 +10,13 @@ function getZillowApiKey(): string {
   return key;
 }
 
+function zillowHeaders(host: string): Record<string, string> {
+  return {
+    "x-rapidapi-key": getZillowApiKey(),
+    "x-rapidapi-host": host,
+  };
+}
+
 function extractZestimate(data: unknown): number | null {
   if (typeof data !== "object" || data === null) return null;
   const record = data as Record<string, unknown>;
@@ -24,17 +31,33 @@ function extractZestimate(data: unknown): number | null {
   return null;
 }
 
+/** Resolves a free-text address to a Zillow Property ID via the search endpoint. */
+async function findZpid(address: string): Promise<string> {
+  const host = getZillowHost();
+  const res = await fetch(
+    `https://${host}/propertyExtendedSearch?location=${encodeURIComponent(address)}`,
+    { headers: zillowHeaders(host) }
+  );
+  if (!res.ok) {
+    throw new Error(`Zillow address search failed for "${address}": ${res.status}`);
+  }
+  const data = (await res.json()) as { props?: Array<{ zpid?: string | number }> };
+  const zpid = data.props?.[0]?.zpid;
+  if (zpid == null) {
+    throw new Error(`No property found for "${address}"`);
+  }
+  return String(zpid);
+}
+
 /** Looks up a live Zestimate for an address via a RapidAPI Zillow data provider. */
 export async function fetchZestimate(address: string): Promise<number> {
+  const zpid = await findZpid(address);
   const host = getZillowHost();
-  const res = await fetch(`https://${host}/property?address=${encodeURIComponent(address)}`, {
-    headers: {
-      "x-rapidapi-key": getZillowApiKey(),
-      "x-rapidapi-host": host,
-    },
+  const res = await fetch(`https://${host}/property?zpid=${zpid}`, {
+    headers: zillowHeaders(host),
   });
   if (!res.ok) {
-    throw new Error(`Zillow lookup failed for "${address}": ${res.status}`);
+    throw new Error(`Zillow property lookup failed for "${address}" (zpid ${zpid}): ${res.status}`);
   }
   const zestimate = extractZestimate(await res.json());
   if (zestimate == null) {
