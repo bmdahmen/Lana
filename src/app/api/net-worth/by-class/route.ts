@@ -5,7 +5,7 @@ import { getNetWorthByClass } from "@/lib/queries";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const days = Math.min(Number(searchParams.get("days") ?? 90), 3650);
+  const days = Math.min(Number(searchParams.get("days") ?? 90), 4400);
 
   const db = await getDB();
   await recomputeNetWorth(db);
