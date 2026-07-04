@@ -7,18 +7,14 @@ interface McpToolResponse {
   error?: { code: number; message: string };
 }
 
-async function callEraTool<T>(name: string, args: Record<string, unknown> = {}): Promise<T> {
-  const apiKey = process.env.ERA_API_KEY;
-  if (!apiKey) {
-    throw new Error("ERA_API_KEY must be set");
-  }
-
+async function callEraToolOnce<T>(apiKey: string, name: string, args: Record<string, unknown>): Promise<T> {
   const res = await fetch(ERA_MCP_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json, text/event-stream",
       Authorization: `Bearer ${apiKey}`,
+      "User-Agent": "Lana/1.0 (+https://lana.bmdahmen.workers.dev)",
     },
     body: JSON.stringify({
       jsonrpc: "2.0",
@@ -29,8 +25,20 @@ async function callEraTool<T>(name: string, args: Record<string, unknown> = {}):
   });
 
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Era MCP error ${res.status}: ${text}`);
+    const text = await res.text().catch(() => "<failed to read body>");
+    console.error(
+      `Era MCP call to ${name} failed`,
+      JSON.stringify({
+        status: res.status,
+        statusText: res.statusText,
+        contentType: res.headers.get("content-type"),
+        server: res.headers.get("server"),
+        cfRay: res.headers.get("cf-ray"),
+        bodyLength: text.length,
+        bodyPreview: text.slice(0, 500),
+      })
+    );
+    throw new Error(`Era MCP error ${res.status}: ${text || "(empty body)"}`);
   }
 
   const data = (await res.json()) as McpToolResponse;
@@ -44,6 +52,21 @@ async function callEraTool<T>(name: string, args: Record<string, unknown> = {}):
   }
 
   return JSON.parse(text) as T;
+}
+
+async function callEraTool<T>(name: string, args: Record<string, unknown> = {}): Promise<T> {
+  const apiKey = process.env.ERA_API_KEY;
+  if (!apiKey) {
+    throw new Error("ERA_API_KEY must be set");
+  }
+
+  try {
+    return await callEraToolOnce<T>(apiKey, name, args);
+  } catch (error) {
+    console.error(`Era MCP call to ${name} failed once, retrying in 500ms`, (error as Error).message);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return callEraToolOnce<T>(apiKey, name, args);
+  }
 }
 
 export interface EraAccount {
