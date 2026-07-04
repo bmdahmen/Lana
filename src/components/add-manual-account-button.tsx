@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ASSET_CLASSES, PRECIOUS_METALS, type PreciousMetal } from "@/lib/asset-classes";
 import { formatCurrency } from "@/lib/format";
+import type { AddressSuggestion } from "@/lib/zillow";
 
 export function AddManualAccountButton() {
   const router = useRouter();
@@ -15,8 +16,10 @@ export function AddManualAccountButton() {
   const [troyOz, setTroyOz] = useState("");
   const [spotPrices, setSpotPrices] = useState<Record<PreciousMetal, number> | null>(null);
   const [propertyAddress, setPropertyAddress] = useState("");
+  const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const suppressSuggestRef = useRef(false);
 
   const isPreciousMetal = assetClass === "precious_metals";
   const isRealEstate = assetClass === "real_estate";
@@ -28,6 +31,31 @@ export function AddManualAccountButton() {
       .then(setSpotPrices)
       .catch(() => {});
   }, [isPreciousMetal, spotPrices]);
+
+  useEffect(() => {
+    if (!isRealEstate) return;
+    if (suppressSuggestRef.current) {
+      suppressSuggestRef.current = false;
+      return;
+    }
+    const timeout = setTimeout(() => {
+      if (propertyAddress.trim().length < 3) {
+        setAddressSuggestions([]);
+        return;
+      }
+      fetch(`/api/zillow/suggest?q=${encodeURIComponent(propertyAddress)}`)
+        .then((res) => res.json() as Promise<{ suggestions: AddressSuggestion[] }>)
+        .then((data) => setAddressSuggestions(data.suggestions))
+        .catch(() => setAddressSuggestions([]));
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [isRealEstate, propertyAddress]);
+
+  function selectAddressSuggestion(address: string) {
+    suppressSuggestRef.current = true;
+    setPropertyAddress(address);
+    setAddressSuggestions([]);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -144,17 +172,35 @@ export function AddManualAccountButton() {
                   </div>
                 </>
               ) : isRealEstate ? (
-                <div>
+                <div className="relative">
                   <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                     Property address
                   </label>
                   <input
                     required
+                    autoComplete="street-address"
                     value={propertyAddress}
                     onChange={(e) => setPropertyAddress(e.target.value)}
+                    onBlur={() => setAddressSuggestions([])}
                     placeholder="e.g. 1600 Pennsylvania Ave NW, Washington, DC 20500"
                     className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
                   />
+                  {addressSuggestions.length > 0 && (
+                    <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-md border border-zinc-300 bg-white text-sm shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+                      {addressSuggestions.map((s) => (
+                        <li key={s.zpid}>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => selectAddressSuggestion(s.address)}
+                            className="block w-full px-3 py-2 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                          >
+                            {s.address}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   <p className="mt-1 text-xs text-zinc-500">
                     The balance is set from Zillow&apos;s Zestimate for this address and refreshes automatically.
                   </p>
