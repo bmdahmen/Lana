@@ -4,9 +4,10 @@ import { recomputeNetWorth } from "@/lib/sync";
 import { recomputeMetalAccountBalances } from "@/lib/spot-price";
 import { recomputeRealEstateAccountBalances } from "@/lib/zillow";
 import { getNetWorthByClass } from "@/lib/queries";
-import { ASSET_CLASSES } from "@/lib/asset-classes";
+import { ASSET_CLASSES, type AssetClass } from "@/lib/asset-classes";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { NetWorthHero } from "@/components/net-worth-hero";
+import { CategoryBreakdown } from "@/components/category-breakdown";
 
 const HERO_DEFAULT_DAYS = 365;
 
@@ -19,6 +20,15 @@ interface RecentTransaction {
   account_name: string;
   category_name: string | null;
   category_icon: string | null;
+}
+
+interface AccountSummaryRow {
+  id: string;
+  name: string;
+  asset_class: AssetClass;
+  current_balance: number | null;
+  mask: string | null;
+  updated_at: string;
 }
 
 export default async function DashboardPage() {
@@ -54,6 +64,18 @@ export default async function DashboardPage() {
       }))
     : [];
 
+  const today = new Date().toISOString().slice(0, 10);
+  const accountsResult = await db
+    .prepare(
+      `SELECT id, name, asset_class, current_balance, mask, updated_at FROM account
+       WHERE is_closed = 0 AND is_hidden = 0
+         AND (relevant_until IS NULL OR relevant_until >= ?)
+       ORDER BY current_balance DESC`
+    )
+    .bind(today)
+    .all<AccountSummaryRow>();
+  const accountsByClass = accountsResult.results ?? [];
+
   return (
     <div className="mx-auto flex max-w-2xl flex-col">
       <header className="flex items-center justify-between px-4 pt-6 pb-2 sm:px-8 md:hidden">
@@ -74,26 +96,7 @@ export default async function DashboardPage() {
       {classBreakdown.length > 0 && (
         <section className="pb-6">
           <h2 className="mb-3 px-4 text-sm font-medium text-zinc-500 sm:px-8">By category</h2>
-          <div className="no-scrollbar flex gap-3 overflow-x-auto px-4 sm:px-8">
-            {classBreakdown.map((cls) => (
-              <Link
-                key={cls.id}
-                href="/net-worth"
-                className="flex min-w-[132px] shrink-0 flex-col gap-2 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950"
-              >
-                <span className="flex items-center gap-2 text-xs font-medium text-zinc-500">
-                  <span
-                    className="h-2 w-2 rounded-full"
-                    style={{ backgroundColor: `var(${cls.colorVar})` }}
-                  />
-                  {cls.label}
-                </span>
-                <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-                  {formatCurrency(cls.value)}
-                </span>
-              </Link>
-            ))}
-          </div>
+          <CategoryBreakdown classes={classBreakdown} accounts={accountsByClass} />
         </section>
       )}
 
