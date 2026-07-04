@@ -17,6 +17,7 @@ export function AddManualAccountButton() {
   const [spotPrices, setSpotPrices] = useState<Record<PreciousMetal, number> | null>(null);
   const [propertyAddress, setPropertyAddress] = useState("");
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
+  const [manualRealEstateValue, setManualRealEstateValue] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const suppressSuggestRef = useRef(false);
@@ -33,7 +34,7 @@ export function AddManualAccountButton() {
   }, [isPreciousMetal, spotPrices]);
 
   useEffect(() => {
-    if (!isRealEstate) return;
+    if (!isRealEstate || manualRealEstateValue) return;
     if (suppressSuggestRef.current) {
       suppressSuggestRef.current = false;
       return;
@@ -57,7 +58,7 @@ export function AddManualAccountButton() {
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [isRealEstate, propertyAddress]);
+  }, [isRealEstate, manualRealEstateValue, propertyAddress]);
 
   function selectAddressSuggestion(address: string) {
     suppressSuggestRef.current = true;
@@ -72,7 +73,7 @@ export function AddManualAccountButton() {
     try {
       const body = isPreciousMetal
         ? { name, assetClass, preciousMetal, metalTroyOz: Number(troyOz) }
-        : isRealEstate
+        : isRealEstate && !manualRealEstateValue
           ? { name, assetClass, propertyAddress: propertyAddress.replace(/\s*\n+\s*/g, ", ").trim() }
           : { name, assetClass, currentBalance: Number(balance) };
       const res = await fetch("/api/accounts", {
@@ -90,6 +91,7 @@ export function AddManualAccountButton() {
       setBalance("");
       setTroyOz("");
       setPropertyAddress("");
+      setManualRealEstateValue(false);
       router.refresh();
     } finally {
       setSubmitting(false);
@@ -179,7 +181,7 @@ export function AddManualAccountButton() {
                     )}
                   </div>
                 </>
-              ) : isRealEstate ? (
+              ) : isRealEstate && !manualRealEstateValue ? (
                 <div className="relative">
                   <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                     Property address
@@ -211,7 +213,38 @@ export function AddManualAccountButton() {
                     </ul>
                   )}
                   <p className="mt-1 text-xs text-zinc-500">
-                    The balance is set from Zillow&apos;s Zestimate for this address and refreshes automatically.
+                    The balance is set from Zillow&apos;s Zestimate for this address and refreshes automatically.{" "}
+                    <button
+                      type="button"
+                      onClick={() => setManualRealEstateValue(true)}
+                      className="underline hover:text-zinc-700 dark:hover:text-zinc-300"
+                    >
+                      Enter a value manually instead.
+                    </button>
+                  </p>
+                </div>
+              ) : isRealEstate ? (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    Current value
+                  </label>
+                  <input
+                    required
+                    type="number"
+                    step="0.01"
+                    value={balance}
+                    onChange={(e) => setBalance(e.target.value)}
+                    placeholder="e.g. 750000"
+                    className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
+                  />
+                  <p className="mt-1 text-xs text-zinc-500">
+                    <button
+                      type="button"
+                      onClick={() => setManualRealEstateValue(false)}
+                      className="underline hover:text-zinc-700 dark:hover:text-zinc-300"
+                    >
+                      Look up automatically from Zillow instead.
+                    </button>
                   </p>
                 </div>
               ) : (

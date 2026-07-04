@@ -46,7 +46,7 @@ const createSchema = z
         return data.preciousMetal !== undefined && data.metalTroyOz !== undefined;
       }
       if (data.assetClass === "real_estate") {
-        return data.propertyAddress !== undefined;
+        return data.propertyAddress !== undefined || data.currentBalance !== undefined;
       }
       return data.currentBalance !== undefined;
     },
