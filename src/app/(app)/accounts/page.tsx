@@ -1,8 +1,7 @@
 import { getDB } from "@/lib/db";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { ASSET_CLASSES, type PreciousMetal } from "@/lib/asset-classes";
-import { recomputeMetalAccountBalances } from "@/lib/spot-price";
-import { recomputeRealEstateAccountBalances } from "@/lib/zillow";
+import { recomputeAccountBalances } from "@/lib/sync";
 import { AddManualAccountButton } from "@/components/add-manual-account-button";
 import { AccountRowActions } from "@/components/account-row-actions";
 import { LinkAccountButton } from "@/components/link-account-button";
@@ -31,8 +30,7 @@ const CLASS_LABEL = new Map<string, string>(ASSET_CLASSES.map((c) => [c.id, c.la
 
 export default async function AccountsPage() {
   const db = await getDB();
-  await recomputeMetalAccountBalances(db);
-  await recomputeRealEstateAccountBalances(db);
+  await recomputeAccountBalances(db);
   const result = await db
     .prepare(
       `SELECT a.id, a.name, a.official_name, a.mask, a.current_balance, a.is_manual, a.is_hidden,

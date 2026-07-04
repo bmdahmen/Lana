@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { getDB } from "@/lib/db";
-import { recomputeNetWorth } from "@/lib/sync";
-import { recomputeMetalAccountBalances } from "@/lib/spot-price";
-import { recomputeRealEstateAccountBalances } from "@/lib/zillow";
+import { recomputeAccountBalances } from "@/lib/sync";
 import { getNetWorthByClass } from "@/lib/queries";
 import { ASSET_CLASSES, type AssetClass } from "@/lib/asset-classes";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -33,9 +31,7 @@ interface AccountSummaryRow {
 
 export default async function DashboardPage() {
   const db = await getDB();
-  await recomputeMetalAccountBalances(db);
-  await recomputeRealEstateAccountBalances(db);
-  await recomputeNetWorth(db);
+  await recomputeAccountBalances(db);
 
   const byClassPoints = await getNetWorthByClass(db, HERO_DEFAULT_DAYS);
   const latest = byClassPoints[byClassPoints.length - 1];

@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     }
   }
 
-  await recomputeNetWorth(db);
+  await recomputeNetWorth(db, { force: true });
 
   return NextResponse.json({ ok: true, imported, skipped });
 }
