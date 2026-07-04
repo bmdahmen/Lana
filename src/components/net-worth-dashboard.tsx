@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import clsx from "clsx";
 import { NetWorthByClassChart } from "@/components/net-worth-by-class-chart";
 import { CategoryBreakdown } from "@/components/category-breakdown";
-import { ASSET_CLASSES, type AssetClass } from "@/lib/asset-classes";
+import { NET_WORTH_DISPLAY_CLASSES, type AssetClass } from "@/lib/asset-classes";
 import { formatCurrency, formatDate } from "@/lib/format";
 import {
   HOME_RANGES,
@@ -49,7 +49,7 @@ export function NetWorthDashboard({
   const rangeLabel = HOME_RANGES.find((r) => r.days === days)?.label ?? "";
 
   const classBreakdown = displayPoint
-    ? ASSET_CLASSES.filter((cls) => Number(displayPoint[cls.id] ?? 0) !== 0).map((cls) => ({
+    ? NET_WORTH_DISPLAY_CLASSES.filter((cls) => Number(displayPoint[cls.id] ?? 0) !== 0).map((cls) => ({
         ...cls,
         value: Number(displayPoint[cls.id] ?? 0),
       }))

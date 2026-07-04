@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import clsx from "clsx";
 import { NetWorthByClassChart } from "@/components/net-worth-by-class-chart";
-import { ASSET_CLASSES } from "@/lib/asset-classes";
+import { NET_WORTH_DISPLAY_CLASSES } from "@/lib/asset-classes";
 import { formatCurrency, formatDate } from "@/lib/format";
 import {
   HISTORY_RANGES,
@@ -29,7 +29,7 @@ export function NetWorthHistory({
   const latest = points[points.length - 1];
   const displayPoint = scrubPoint ?? latest;
   const legend = displayPoint
-    ? ASSET_CLASSES.filter((cls) => Number(displayPoint[cls.id] ?? 0) !== 0)
+    ? NET_WORTH_DISPLAY_CLASSES.filter((cls) => Number(displayPoint[cls.id] ?? 0) !== 0)
         .map((cls) => ({ ...cls, value: Number(displayPoint[cls.id] ?? 0) }))
         .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
     : [];

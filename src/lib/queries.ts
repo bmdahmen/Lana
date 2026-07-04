@@ -79,6 +79,13 @@ async function computeNetWorthSeries(db: D1Database): Promise<NetWorthByClassPoi
       netWorth += id === "liabilities" ? -value : value;
     }
     point.net_worth = netWorth;
+
+    // The by-class breakdown shows home equity, not gross real estate value
+    // and a separate debt line -- net_worth above already accounts for the
+    // true liabilities total, so this only affects the displayed category.
+    point.real_estate = Number(point.real_estate ?? 0) - Number(point.liabilities ?? 0);
+    point.liabilities = 0;
+
     return point;
   });
 
