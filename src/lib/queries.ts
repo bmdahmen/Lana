@@ -48,5 +48,18 @@ export async function getNetWorthByClass(
     return point;
   });
 
-  return points.slice(-days);
+  // `days` is a calendar cutoff, not an entry count -- history is often
+  // monthly-granularity (or sparser), so slicing by index would return the
+  // entire series for any range longer than a few data points.
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const cutoffDate = cutoff.toISOString().slice(0, 10);
+
+  const cutoffIndex = points.findIndex((p) => p.date >= cutoffDate);
+  if (cutoffIndex <= 0) return points;
+
+  // Keep one point before the cutoff as the range's starting baseline, so
+  // delta/percent-change reflects the value as of the start of the range
+  // instead of falling back to zero.
+  return points.slice(cutoffIndex - 1);
 }
