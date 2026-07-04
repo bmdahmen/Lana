@@ -1,5 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect x="2" y="7" width="28" height="19" rx="4" fill="#000"/>
-  <rect x="2" y="13" width="28" height="2.6" fill="#fff"/>
-  <circle cx="25" cy="14.3" r="2.6" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect x="18" y="14" width="48" height="38" rx="4" fill="#fff" stroke="#000" stroke-width="3" transform="rotate(-8 42 33)"/>
+  <rect x="34" y="10" width="48" height="38" rx="4" fill="#fff" stroke="#000" stroke-width="3" transform="rotate(6 58 29)"/>
+  <rect x="10" y="40" width="80" height="50" rx="12" fill="#000"/>
+  <circle cx="68" cy="65" r="6" fill="#fff"/>
 </svg>
