@@ -47,7 +47,8 @@ function extractZestimate(data: unknown): number | null {
   return null;
 }
 
-async function searchProperties(query: string): Promise<Array<Record<string, unknown>>> {
+async function searchProperties(rawQuery: string): Promise<Array<Record<string, unknown>>> {
+  const query = rawQuery.replace(/\s*\n+\s*/g, ", ").trim();
   const host = getZillowHost();
   const res = await zillowFetch(
     `https://${host}/propertyExtendedSearch?location=${encodeURIComponent(query)}`,

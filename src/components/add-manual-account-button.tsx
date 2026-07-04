@@ -73,7 +73,7 @@ export function AddManualAccountButton() {
       const body = isPreciousMetal
         ? { name, assetClass, preciousMetal, metalTroyOz: Number(troyOz) }
         : isRealEstate
-          ? { name, assetClass, propertyAddress }
+          ? { name, assetClass, propertyAddress: propertyAddress.replace(/\s*\n+\s*/g, ", ").trim() }
           : { name, assetClass, currentBalance: Number(balance) };
       const res = await fetch("/api/accounts", {
         method: "POST",
@@ -184,14 +184,15 @@ export function AddManualAccountButton() {
                   <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                     Property address
                   </label>
-                  <input
+                  <textarea
                     required
+                    rows={2}
                     autoComplete="street-address"
                     value={propertyAddress}
                     onChange={(e) => setPropertyAddress(e.target.value)}
                     onBlur={() => setAddressSuggestions([])}
                     placeholder="e.g. 1600 Pennsylvania Ave NW, Washington, DC 20500"
-                    className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
+                    className="w-full resize-none rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
                   />
                   {addressSuggestions.length > 0 && (
                     <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-md border border-zinc-300 bg-white text-sm shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
