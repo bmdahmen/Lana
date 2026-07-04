@@ -17,6 +17,22 @@ function zillowHeaders(host: string): Record<string, string> {
   };
 }
 
+const RATE_LIMIT_RETRY_DELAYS_MS = [500, 1500];
+
+/** RapidAPI free/basic tiers commonly cap requests per second; retry a 429 a couple times before giving up. */
+async function zillowFetch(url: string, host: string): Promise<Response> {
+  let res: Response;
+  for (let attempt = 0; ; attempt++) {
+    res = await fetch(url, { headers: zillowHeaders(host) });
+    if (res.status !== 429 || attempt >= RATE_LIMIT_RETRY_DELAYS_MS.length) return res;
+    await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_RETRY_DELAYS_MS[attempt]));
+  }
+}
+
+function describeStatus(status: number): string {
+  return status === 429 ? "rate limited by the Zillow API — wait a moment and try again" : `HTTP ${status}`;
+}
+
 function extractZestimate(data: unknown): number | null {
   if (typeof data !== "object" || data === null) return null;
   const record = data as Record<string, unknown>;
@@ -33,12 +49,12 @@ function extractZestimate(data: unknown): number | null {
 
 async function searchProperties(query: string): Promise<Array<Record<string, unknown>>> {
   const host = getZillowHost();
-  const res = await fetch(
+  const res = await zillowFetch(
     `https://${host}/propertyExtendedSearch?location=${encodeURIComponent(query)}`,
-    { headers: zillowHeaders(host) }
+    host
   );
   if (!res.ok) {
-    throw new Error(`Zillow address search failed for "${query}": ${res.status}`);
+    throw new Error(`Zillow address search failed for "${query}": ${describeStatus(res.status)}`);
   }
   const data = (await res.json()) as { props?: Array<Record<string, unknown>> };
   return data.props ?? [];
@@ -90,12 +106,13 @@ export async function suggestAddresses(query: string): Promise<AddressSuggestion
 /** Looks up a live Zestimate for an address via a RapidAPI Zillow data provider. */
 export async function fetchZestimate(address: string): Promise<number> {
   const zpid = await findZpid(address);
+  await new Promise((resolve) => setTimeout(resolve, 350));
   const host = getZillowHost();
-  const res = await fetch(`https://${host}/property?zpid=${zpid}`, {
-    headers: zillowHeaders(host),
-  });
+  const res = await zillowFetch(`https://${host}/property?zpid=${zpid}`, host);
   if (!res.ok) {
-    throw new Error(`Zillow property lookup failed for "${address}" (zpid ${zpid}): ${res.status}`);
+    throw new Error(
+      `Zillow property lookup failed for "${address}" (zpid ${zpid}): ${describeStatus(res.status)}`
+    );
   }
   const zestimate = extractZestimate(await res.json());
   if (zestimate == null) {
