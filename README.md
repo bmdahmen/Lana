@@ -29,14 +29,32 @@ Cloudflare D1 (SQLite) as the database.
    npm run dev
    ```
 
-   Open http://localhost:3000 — you'll be prompted to create your account on
-   first visit (single-user app, no invite/signup flow beyond that).
+   Open http://localhost:3000 — click "Continue with Google" to sign in. Only
+   the Google account in `GOOGLE_ALLOWED_EMAIL` can sign in; anyone else's
+   Google login is rejected.
+
+## Google sign-in setup
+
+Lana has no password — it uses [Google Identity Services](https://developers.google.com/identity/gsi/web)
+("Sign in with Google") and locks access to a single email address.
+
+1. Go to the [Google Cloud Console credentials page](https://console.cloud.google.com/apis/credentials).
+2. Create an **OAuth client ID** → Application type: **Web application**.
+3. Under **Authorized JavaScript origins**, add:
+   - `http://localhost:3000` (for local dev)
+   - your deployed URL, e.g. `https://lana.<your-subdomain>.workers.dev`
+   - No redirect URI is needed — this uses the token flow, not a redirect.
+4. Copy the generated **Client ID** into `NEXT_PUBLIC_GOOGLE_CLIENT_ID`.
+5. Set `GOOGLE_ALLOWED_EMAIL` to your own Google account email — sign-in attempts
+   from any other account are rejected with a 403.
 
 ## Environment variables
 
 | Variable | Description |
 |---|---|
-| `SESSION_SECRET` | Random string, 32+ characters, used to encrypt the session cookie. Generate with `openssl rand -base64 32`. |
+| `SESSION_SECRET` | Random string, 32+ characters, used to encrypt the session cookie. |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | OAuth Client ID from Google Cloud Console (see above). Exposed to the browser — this is expected, it's not a secret. |
+| `GOOGLE_ALLOWED_EMAIL` | The only Google account allowed to sign in. |
 | `PLAID_CLIENT_ID` | From the [Plaid dashboard](https://dashboard.plaid.com/team-settings/keys). |
 | `PLAID_SECRET` | Matching secret for your `PLAID_ENV` (sandbox/development/production). |
 | `PLAID_ENV` | `sandbox`, `development`, or `production`. |
@@ -70,11 +88,18 @@ deploy:
 
 ```bash
 npx wrangler secret put SESSION_SECRET
+npx wrangler secret put GOOGLE_ALLOWED_EMAIL
 npx wrangler secret put PLAID_CLIENT_ID
 npx wrangler secret put PLAID_SECRET
 npx wrangler secret put PLAID_ENV
 npx wrangler secret put PLAID_WEBHOOK_URL
 ```
+
+`NEXT_PUBLIC_GOOGLE_CLIENT_ID` is different: Next.js inlines `NEXT_PUBLIC_*`
+variables into the compiled bundle at **build time**, not at Worker runtime — so
+it won't work as a `wrangler secret` or a `wrangler.jsonc` var. Make sure it's
+set in `.env.local` (or your shell) *before* running `npm run cf:deploy`, since
+that's when `next build` actually runs and bakes the value in.
 
 To preview the production build locally against real Cloudflare bindings:
 
@@ -84,9 +109,10 @@ npm run cf:preview
 
 ## Architecture notes
 
-- **Auth**: single-user, cookie-based session (`iron-session`), password hashed
-  with PBKDF2 (Web Crypto). No multi-tenancy — this app is meant to be deployed
-  for one person.
+- **Auth**: Google sign-in only (no password) via Google Identity Services,
+  restricted to `GOOGLE_ALLOWED_EMAIL`. The verified Google token creates a
+  cookie-based session (`iron-session`). No multi-tenancy — this app is meant
+  to be deployed for one person.
 - **Data model**: `migrations/0001_init.sql` onward. Accounts carry both a Plaid
   `type`/`subtype` (when linked) and an `asset_class` (cash, brokerage,
   retirement, crypto, real_estate, hard_asset, liabilities, other) used for the
