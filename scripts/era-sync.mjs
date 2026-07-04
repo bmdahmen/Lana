@@ -37,6 +37,18 @@ async function callEraTool(name, args = {}) {
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
+    console.error(
+      "Era MCP call failed",
+      JSON.stringify({
+        status: res.status,
+        statusText: res.statusText,
+        contentType: res.headers.get("content-type"),
+        server: res.headers.get("server"),
+        cfRay: res.headers.get("cf-ray"),
+        bodyLength: text.length,
+        bodyPreview: text.slice(0, 500),
+      })
+    );
     throw new Error(`Era MCP error ${res.status}: ${text || "(empty body)"}`);
   }
 
