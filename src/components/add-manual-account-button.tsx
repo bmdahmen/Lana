@@ -38,17 +38,25 @@ export function AddManualAccountButton() {
       suppressSuggestRef.current = false;
       return;
     }
+    const controller = new AbortController();
     const timeout = setTimeout(() => {
-      if (propertyAddress.trim().length < 3) {
+      if (propertyAddress.trim().length < 5) {
         setAddressSuggestions([]);
         return;
       }
-      fetch(`/api/zillow/suggest?q=${encodeURIComponent(propertyAddress)}`)
+      fetch(`/api/zillow/suggest?q=${encodeURIComponent(propertyAddress)}`, {
+        signal: controller.signal,
+      })
         .then((res) => res.json() as Promise<{ suggestions: AddressSuggestion[] }>)
         .then((data) => setAddressSuggestions(data.suggestions))
-        .catch(() => setAddressSuggestions([]));
-    }, 300);
-    return () => clearTimeout(timeout);
+        .catch((err) => {
+          if (err?.name !== "AbortError") setAddressSuggestions([]);
+        });
+    }, 500);
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
   }, [isRealEstate, propertyAddress]);
 
   function selectAddressSuggestion(address: string) {
