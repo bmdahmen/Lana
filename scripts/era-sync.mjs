@@ -26,6 +26,7 @@ async function callEraTool(name, args = {}) {
       "Content-Type": "application/json",
       Accept: "application/json, text/event-stream",
       Authorization: `Bearer ${ERA_API_KEY}`,
+      "User-Agent": "Lana-Sync/1.0 (+https://github.com/bmdahmen/Lana)",
     },
     body: JSON.stringify({
       jsonrpc: "2.0",
