@@ -21,6 +21,9 @@ const PRIMARY_CATEGORY_MAP: Record<string, string> = {
 const DETAILED_CATEGORY_MAP: Record<string, string> = {
   FOOD_AND_DRINK_GROCERIES: "cat_groceries",
   GENERAL_SERVICES_EDUCATION: "cat_education",
+  // Credit card payments move money to an account whose individual purchases
+  // are already categorized elsewhere, so they aren't spending on their own.
+  LOAN_PAYMENTS_CREDIT_CARD_PAYMENT: "cat_transfer",
 };
 
 export function defaultCategoryFor(
