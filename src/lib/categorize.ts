@@ -36,6 +36,33 @@ export function defaultCategoryFor(
   return "cat_other";
 }
 
+const MX_CATEGORY_KEYWORDS: Array<[RegExp, string]> = [
+  [/paycheck|payroll|salary|income/, "cat_income"],
+  [/transfer/, "cat_transfer"],
+  [/rent|mortgage/, "cat_housing"],
+  [/grocery|groceries|supermarket/, "cat_groceries"],
+  [/utilit|electric|water bill|internet|cable/, "cat_utilities"],
+  [/restaurant|dining|coffee|fast food/, "cat_food"],
+  [/gas station|fuel|parking|uber|lyft|taxi|transit|transportation/, "cat_transportation"],
+  [/subscription/, "cat_subscriptions"],
+  [/entertainment|movie|music|streaming|game/, "cat_entertainment"],
+  [/health|medical|pharmacy|doctor|dental/, "cat_health"],
+  [/travel|airline|hotel|flight/, "cat_travel"],
+  [/personal care|salon|spa|gym|fitness/, "cat_personal"],
+  [/education|tuition|student loan/, "cat_education"],
+  [/fee|interest charge|service charge/, "cat_fees"],
+  [/shopping|merchandise|retail|clothing/, "cat_shopping"],
+];
+
+export function defaultCategoryForMx(mxCategory: string | null | undefined): string {
+  if (!mxCategory) return "cat_other";
+  const lower = mxCategory.toLowerCase();
+  for (const [pattern, categoryId] of MX_CATEGORY_KEYWORDS) {
+    if (pattern.test(lower)) return categoryId;
+  }
+  return "cat_other";
+}
+
 export interface CategoryRule {
   match_field: "merchant_name" | "name";
   match_type: "contains" | "equals";

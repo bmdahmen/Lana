@@ -59,6 +59,28 @@ Lana has no password — it uses [Google Identity Services](https://developers.g
 | `PLAID_SECRET` | Matching secret for your `PLAID_ENV` (sandbox/development/production). |
 | `PLAID_ENV` | `sandbox`, `development`, or `production`. |
 | `PLAID_WEBHOOK_URL` | Optional. Your deployed URL + `/api/plaid/webhook`, so Plaid can push transaction updates instead of relying on manual sync. |
+| `MX_CLIENT_ID` | From the [MX dashboard](https://dashboard.mx.com) — used for brokerages Plaid doesn't reach (Vanguard, Fidelity, Schwab, Robinhood). |
+| `MX_API_KEY` | Matching API key for your `MX_ENV`. |
+| `MX_ENV` | `sandbox` or `production`. Sandbox uses `int-api.mx.com`, production uses `api.mx.com`. |
+
+## MX setup (Vanguard, Fidelity, Schwab, Robinhood, and other brokerages)
+
+Plaid doesn't support most brokerages' investment accounts, so Lana uses
+[MX](https://www.mx.com) as a second aggregator just for those. Everything else
+(regular banks, PayPal, credit cards) still goes through Plaid.
+
+1. Sign up at https://dashboard.mx.com and grab your **Client ID** and **API Key**
+   from Settings → Keys. Start with the sandbox keys.
+2. Set `MX_CLIENT_ID`, `MX_API_KEY`, and `MX_ENV=sandbox` in `.env.local`.
+3. On the Dashboard or Accounts page, click **"Link brokerage / bank (MX)"** —
+   it opens MX's Connect widget in a modal, the same kind of flow as Plaid Link.
+4. Optional: register a webhook in the MX dashboard pointing at
+   `<your-deployed-url>/api/mx/webhook` so new transactions sync automatically
+   instead of waiting for a manual `/api/mx/sync` call.
+
+Unlike Plaid, MX doesn't have a cursor-based sync — every sync just re-pulls the
+last ~120 days of transactions and upserts by MX's transaction GUID, so it's
+safe to call `/api/mx/sync` as often as you like.
 
 ## Database
 
@@ -75,6 +97,8 @@ Schema lives in `migrations/*.sql`, applied in order. The Cloudflare D1 database
   Cron Trigger hitting this endpoint).
 - If `PLAID_WEBHOOK_URL` is configured, Plaid calls `/api/plaid/webhook` whenever
   new transactions are ready, which syncs that item immediately.
+- `/api/mx/sync` (POST) does the same for every MX-linked brokerage/bank member.
+  MX pushes updates to `/api/mx/webhook` if you've registered one (see MX setup above).
 
 ## Deploying to Cloudflare
 

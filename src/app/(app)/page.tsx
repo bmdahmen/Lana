@@ -4,6 +4,7 @@ import { getNetWorthByClass } from "@/lib/queries";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { NetWorthByClassChart } from "@/components/net-worth-by-class-chart";
 import { LinkAccountButton } from "@/components/link-account-button";
+import { LinkMxAccountButton } from "@/components/link-mx-account-button";
 
 interface Snapshot {
   date: string;
@@ -59,7 +60,10 @@ export default async function DashboardPage() {
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Dashboard</h1>
-        <LinkAccountButton />
+        <div className="flex gap-2">
+          <LinkAccountButton />
+          <LinkMxAccountButton />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

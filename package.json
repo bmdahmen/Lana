@@ -15,6 +15,7 @@
     "db:migrate:remote": "bash scripts/migrate.sh --remote"
   },
   "dependencies": {
+    "@mxenabled/web-connect-widget-sdk": "^1.0.1",
     "clsx": "^2.1.1",
     "iron-session": "^8.0.4",
     "next": "16.2.10",
