@@ -3,6 +3,7 @@ import { applyCategoryRules, defaultCategoryFor, type CategoryRule } from "@/lib
 import { newId } from "@/lib/db";
 import { recomputeMetalAccountBalances } from "@/lib/spot-price";
 import { recomputeRealEstateAccountBalances } from "@/lib/zillow";
+import { refreshNetWorthSeriesCache } from "@/lib/queries";
 
 interface PlaidItemRow {
   id: string;
@@ -219,6 +220,11 @@ export async function recomputeNetWorth(
 
   await db.batch(statements);
   await markRecomputed(db);
+
+  // Balances just changed -- refresh the cached series in the background so
+  // the next page load / range switch reads it instantly instead of
+  // re-running the aggregation query.
+  await refreshNetWorthSeriesCache(db);
 }
 
 export { accountIsAsset };

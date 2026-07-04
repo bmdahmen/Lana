@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { getDB } from "@/lib/db";
 import { recomputeAccountBalances } from "@/lib/sync";
-import { getNetWorthByClass } from "@/lib/queries";
-import { ASSET_CLASSES, type AssetClass } from "@/lib/asset-classes";
+import { getNetWorthSeries } from "@/lib/queries";
+import { type AssetClass } from "@/lib/asset-classes";
+import { HOME_RANGES } from "@/lib/net-worth-range";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { NetWorthHero } from "@/components/net-worth-hero";
-import { CategoryBreakdown } from "@/components/category-breakdown";
+import { NetWorthDashboard } from "@/components/net-worth-dashboard";
 
-const HERO_DEFAULT_DAYS = 365;
+const HERO_DEFAULT_DAYS = HOME_RANGES.find((r) => r.label === "1Y")?.days ?? 365;
 
 interface RecentTransaction {
   id: string;
@@ -33,8 +33,7 @@ export default async function DashboardPage() {
   const db = await getDB();
   await recomputeAccountBalances(db);
 
-  const byClassPoints = await getNetWorthByClass(db, HERO_DEFAULT_DAYS);
-  const latest = byClassPoints[byClassPoints.length - 1];
+  const byClassPoints = await getNetWorthSeries(db);
 
   const accountCount = await db
     .prepare("SELECT COUNT(*) as count FROM account WHERE is_closed = 0")
@@ -52,13 +51,6 @@ export default async function DashboardPage() {
     )
     .all<RecentTransaction>();
   const recentTransactions = recentResult.results ?? [];
-
-  const classBreakdown = latest
-    ? ASSET_CLASSES.filter((cls) => Number(latest[cls.id] ?? 0) !== 0).map((cls) => ({
-        ...cls,
-        value: Number(latest[cls.id] ?? 0),
-      }))
-    : [];
 
   const today = new Date().toISOString().slice(0, 10);
   const accountsResult = await db
@@ -85,16 +77,11 @@ export default async function DashboardPage() {
         </Link>
       </header>
 
-      <section className="px-4 pt-4 pb-6 sm:px-8">
-        <NetWorthHero initialPoints={byClassPoints} initialDays={HERO_DEFAULT_DAYS} />
-      </section>
-
-      {classBreakdown.length > 0 && (
-        <section className="pb-6">
-          <h2 className="mb-3 px-4 text-sm font-medium text-zinc-500 sm:px-8">By category</h2>
-          <CategoryBreakdown classes={classBreakdown} accounts={accountsByClass} />
-        </section>
-      )}
+      <NetWorthDashboard
+        initialPoints={byClassPoints}
+        initialDays={HERO_DEFAULT_DAYS}
+        accounts={accountsByClass}
+      />
 
       <section className="px-4 pb-8 sm:px-8">
         <div className="mb-3 flex items-center justify-between">

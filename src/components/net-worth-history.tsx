@@ -1,18 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import clsx from "clsx";
 import { NetWorthByClassChart } from "@/components/net-worth-by-class-chart";
 import { ASSET_CLASSES } from "@/lib/asset-classes";
-import { formatCurrency } from "@/lib/format";
-import type { NetWorthByClassPoint } from "@/lib/queries";
-
-const RANGES: { label: string; days: number }[] = [
-  { label: "1Y", days: 365 },
-  { label: "5Y", days: 1825 },
-  { label: "10Y", days: 3650 },
-  { label: "All", days: 4400 },
-];
+import { formatCurrency, formatDate } from "@/lib/format";
+import {
+  HISTORY_RANGES,
+  sliceNetWorthPointsByDays,
+  type NetWorthByClassPoint,
+} from "@/lib/net-worth-range";
 
 export function NetWorthHistory({
   initialPoints,
@@ -22,31 +19,25 @@ export function NetWorthHistory({
   initialDays: number;
 }) {
   const [days, setDays] = useState(initialDays);
-  const [points, setPoints] = useState(initialPoints);
+  const [scrubPoint, setScrubPoint] = useState<NetWorthByClassPoint | null>(null);
 
-  const load = useCallback(async (d: number) => {
-    const res = await fetch(`/api/net-worth/by-class?days=${d}`);
-    const data = (await res.json()) as { points?: NetWorthByClassPoint[] };
-    setPoints(data.points ?? []);
-  }, []);
-
-  useEffect(() => {
-    if (days === initialDays) return;
-    const timeout = setTimeout(() => load(days), 0);
-    return () => clearTimeout(timeout);
-  }, [days, initialDays, load]);
+  const points = useMemo(
+    () => sliceNetWorthPointsByDays(initialPoints, days),
+    [initialPoints, days]
+  );
 
   const latest = points[points.length - 1];
-  const legend = latest
-    ? ASSET_CLASSES.filter((cls) => Number(latest[cls.id] ?? 0) !== 0)
-        .map((cls) => ({ ...cls, value: Number(latest[cls.id] ?? 0) }))
+  const displayPoint = scrubPoint ?? latest;
+  const legend = displayPoint
+    ? ASSET_CLASSES.filter((cls) => Number(displayPoint[cls.id] ?? 0) !== 0)
+        .map((cls) => ({ ...cls, value: Number(displayPoint[cls.id] ?? 0) }))
         .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
     : [];
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex gap-1">
-        {RANGES.map((r) => (
+        {HISTORY_RANGES.map((r) => (
           <button
             key={r.label}
             onClick={() => setDays(r.days)}
@@ -61,7 +52,12 @@ export function NetWorthHistory({
           </button>
         ))}
       </div>
-      <NetWorthByClassChart points={points} />
+      <NetWorthByClassChart points={points} onScrub={setScrubPoint} />
+      {displayPoint && (
+        <p className="text-xs text-zinc-500">
+          {scrubPoint ? formatDate(scrubPoint.date) : `${formatDate(latest.date)} · latest`}
+        </p>
+      )}
       {legend.length > 0 && (
         <ul className="flex flex-col divide-y divide-zinc-100 dark:divide-zinc-900">
           {legend.map((cls) => (

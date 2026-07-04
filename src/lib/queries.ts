@@ -1,15 +1,49 @@
 import { ASSET_CLASSES, type AssetClass } from "@/lib/asset-classes";
+import type { NetWorthByClassPoint } from "@/lib/net-worth-range";
 
-export interface NetWorthByClassPoint {
-  date: string;
-  net_worth: number;
-  [key: string]: number | string;
+export type { NetWorthByClassPoint };
+
+/**
+ * Returns the full (since-inception) net-worth-by-class series, backed by a
+ * per-day cache so repeated page loads and range switches don't re-run this
+ * join/aggregation on every request. The cache is refreshed by
+ * `refreshNetWorthSeriesCache`, called from `recomputeNetWorth` whenever
+ * balances actually change (see lib/sync.ts).
+ */
+export async function getNetWorthSeries(db: D1Database): Promise<NetWorthByClassPoint[]> {
+  const cached = await db
+    .prepare("SELECT payload FROM net_worth_series_cache WHERE id = 1")
+    .first<{ payload: string }>();
+
+  if (cached) {
+    try {
+      return JSON.parse(cached.payload) as NetWorthByClassPoint[];
+    } catch {
+      // Corrupt cache row -- fall through and recompute.
+    }
+  }
+
+  return refreshNetWorthSeriesCache(db);
 }
 
-export async function getNetWorthByClass(
-  db: D1Database,
-  days: number
+export async function refreshNetWorthSeriesCache(
+  db: D1Database
 ): Promise<NetWorthByClassPoint[]> {
+  const series = await computeNetWorthSeries(db);
+
+  await db
+    .prepare(
+      `INSERT INTO net_worth_series_cache (id, payload, computed_at)
+       VALUES (1, ?, datetime('now'))
+       ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, computed_at = excluded.computed_at`
+    )
+    .bind(JSON.stringify(series))
+    .run();
+
+  return series;
+}
+
+async function computeNetWorthSeries(db: D1Database): Promise<NetWorthByClassPoint[]> {
   const result = await db
     .prepare(
       `SELECT abh.date, a.asset_class, SUM(abh.current_balance) as total
@@ -48,18 +82,5 @@ export async function getNetWorthByClass(
     return point;
   });
 
-  // `days` is a calendar cutoff, not an entry count -- history is often
-  // monthly-granularity (or sparser), so slicing by index would return the
-  // entire series for any range longer than a few data points.
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - days);
-  const cutoffDate = cutoff.toISOString().slice(0, 10);
-
-  const cutoffIndex = points.findIndex((p) => p.date >= cutoffDate);
-  if (cutoffIndex <= 0) return points;
-
-  // Keep one point before the cutoff as the range's starting baseline, so
-  // delta/percent-change reflects the value as of the start of the range
-  // instead of falling back to zero.
-  return points.slice(cutoffIndex - 1);
+  return points;
 }
