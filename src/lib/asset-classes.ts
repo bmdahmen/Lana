@@ -21,6 +21,17 @@ export const ASSET_CLASSES: { id: AssetClass; label: string; colorVar: string }[
   { id: "other", label: "Other", colorVar: "--chart-other" },
 ];
 
+/**
+ * The classes shown in net-worth-by-category graphs: liabilities are netted
+ * into real estate as home equity (see computeNetWorthSeries) rather than
+ * shown as their own line, so this list excludes "liabilities" and relabels
+ * "real_estate" accordingly. Everywhere else (Accounts page, category
+ * pickers, CSV import) still uses ASSET_CLASSES with its normal labels.
+ */
+export const NET_WORTH_DISPLAY_CLASSES = ASSET_CLASSES.filter(
+  (cls) => cls.id !== "liabilities"
+).map((cls) => (cls.id === "real_estate" ? { ...cls, label: "Equity" } : cls));
+
 export const PRECIOUS_METALS = ["gold", "silver"] as const;
 export type PreciousMetal = (typeof PRECIOUS_METALS)[number];
 

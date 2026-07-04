@@ -12,7 +12,7 @@ import {
   useIsTooltipActive,
   useActiveTooltipDataPoints,
 } from "recharts";
-import { ASSET_CLASSES } from "@/lib/asset-classes";
+import { NET_WORTH_DISPLAY_CLASSES } from "@/lib/asset-classes";
 import { formatCompactCurrency, formatDate } from "@/lib/format";
 import type { NetWorthByClassPoint } from "@/lib/net-worth-range";
 
@@ -80,7 +80,7 @@ export function NetWorthByClassChart({
     );
   }
 
-  const activeClasses = ASSET_CLASSES.filter((cls) =>
+  const activeClasses = NET_WORTH_DISPLAY_CLASSES.filter((cls) =>
     points.some((p) => Number(p[cls.id] ?? 0) !== 0)
   );
 
