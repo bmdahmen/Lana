@@ -15,6 +15,39 @@ jobs:
         with:
           node-version: 22
 
+      - name: Diagnose Era connectivity (curl vs Node)
+        env:
+          ERA_API_KEY: ${{ secrets.ERA_API_KEY }}
+        run: |
+          BODY='{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"accounts__list_financial_accounts","arguments":{}}}'
+          echo "--- plain curl ---"
+          curl -s -w "\nHTTP_STATUS:%{http_code}\n" -X POST "https://context.era.app" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json, text/event-stream" \
+            -H "Authorization: Bearer $ERA_API_KEY" \
+            -d "$BODY" | tail -c 800
+          echo "--- node fetch ---"
+          node -e "
+          fetch('https://context.era.app', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json, text/event-stream',
+              'Authorization': 'Bearer ' + process.env.ERA_API_KEY,
+            },
+            body: JSON.stringify({
+              jsonrpc: '2.0', id: 1, method: 'tools/call',
+              params: { name: 'accounts__list_financial_accounts', arguments: {} },
+            }),
+          }).then(async (res) => {
+            console.log('status:', res.status);
+            console.log('server:', res.headers.get('server'));
+            const text = await res.text();
+            console.log('bodyLen:', text.length, text.slice(0, 400));
+          }).catch((e) => console.error('fetch error:', e.message));
+          "
+        continue-on-error: true
+
       - name: Run Era sync
         env:
           ERA_API_KEY: ${{ secrets.ERA_API_KEY }}
