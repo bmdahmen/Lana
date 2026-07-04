@@ -1,9 +1,10 @@
 import { getDB } from "@/lib/db";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { ASSET_CLASSES, type PreciousMetal } from "@/lib/asset-classes";
+import { type AssetClass, type PreciousMetal } from "@/lib/asset-classes";
 import { recomputeAccountBalances } from "@/lib/sync";
 import { AddManualAccountButton } from "@/components/add-manual-account-button";
 import { AccountRowActions } from "@/components/account-row-actions";
+import { AccountCategorySelect } from "@/components/account-category-select";
 import { LinkAccountButton } from "@/components/link-account-button";
 import { LinkMxAccountButton } from "@/components/link-mx-account-button";
 import { ImportCsvButton } from "@/components/import-csv-button";
@@ -16,7 +17,7 @@ interface AccountRow {
   current_balance: number | null;
   is_manual: number;
   is_hidden: number;
-  asset_class: string;
+  asset_class: AssetClass;
   institution_name: string | null;
   item_status: string | null;
   precious_metal: PreciousMetal | null;
@@ -25,8 +26,6 @@ interface AccountRow {
   relevant_until: string | null;
   property_address: string | null;
 }
-
-const CLASS_LABEL = new Map<string, string>(ASSET_CLASSES.map((c) => [c.id, c.label]));
 
 export default async function AccountsPage() {
   const db = await getDB();
@@ -77,12 +76,12 @@ export default async function AccountsPage() {
                     <p className="truncate font-medium text-zinc-900 dark:text-zinc-50">
                       {acc.name}
                     </p>
-                    <p className="mt-0.5 text-xs text-zinc-500">
-                      {CLASS_LABEL.get(acc.asset_class) ?? acc.asset_class}
-                      {acc.mask ? ` · •••• ${acc.mask}` : ""}
-                    </p>
+                    {acc.mask && <p className="mt-0.5 text-xs text-zinc-500">•••• {acc.mask}</p>}
+                    <div className="mt-1">
+                      <AccountCategorySelect accountId={acc.id} assetClass={acc.asset_class} />
+                    </div>
                     {acc.precious_metal && (
-                      <p className="text-xs text-zinc-500">
+                      <p className="mt-1 text-xs text-zinc-500">
                         {acc.metal_troy_oz} troy oz {acc.precious_metal}
                       </p>
                     )}
@@ -157,8 +156,8 @@ export default async function AccountsPage() {
                         <p className="text-xs text-zinc-500">{acc.property_address}</p>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
-                      {CLASS_LABEL.get(acc.asset_class) ?? acc.asset_class}
+                    <td className="px-4 py-3">
+                      <AccountCategorySelect accountId={acc.id} assetClass={acc.asset_class} />
                     </td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                       {acc.is_manual ? "Manual" : acc.institution_name ?? "—"}
