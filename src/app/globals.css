@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  --chart-net-worth: #2a78d6;
+  --chart-cash: #1baf7a;
+  --chart-brokerage: #eda100;
+  --chart-retirement: #008300;
+  --chart-crypto: #4a3aa7;
+  --chart-real-estate: #e34948;
+  --chart-hard-asset: #e87ba4;
+  --chart-liabilities: #eb6834;
+  --chart-other: #898781;
+  --chart-grid: #e1e0d9;
+  --chart-axis: #c3c2b7;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+    --chart-net-worth: #3987e5;
+    --chart-cash: #199e70;
+    --chart-brokerage: #c98500;
+    --chart-retirement: #008300;
+    --chart-crypto: #9085e9;
+    --chart-real-estate: #e66767;
+    --chart-hard-asset: #d55181;
+    --chart-liabilities: #d95926;
+    --chart-other: #898781;
+    --chart-grid: #2c2c2a;
+    --chart-axis: #383835;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}

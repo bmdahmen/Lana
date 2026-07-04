@@ -1,0 +1,17 @@
+INSERT INTO category (id, name, icon, is_income, is_system) VALUES
+  ('cat_income', 'Income', '💰', 1, 1),
+  ('cat_housing', 'Housing', '🏠', 0, 1),
+  ('cat_transportation', 'Transportation', '🚗', 0, 1),
+  ('cat_food', 'Food & Dining', '🍽️', 0, 1),
+  ('cat_groceries', 'Groceries', '🛒', 0, 1),
+  ('cat_shopping', 'Shopping', '🛍️', 0, 1),
+  ('cat_entertainment', 'Entertainment', '🎬', 0, 1),
+  ('cat_health', 'Health & Wellness', '🩺', 0, 1),
+  ('cat_travel', 'Travel', '✈️', 0, 1),
+  ('cat_utilities', 'Bills & Utilities', '🧾', 0, 1),
+  ('cat_subscriptions', 'Subscriptions', '🔁', 0, 1),
+  ('cat_personal', 'Personal Care', '🧴', 0, 1),
+  ('cat_education', 'Education', '🎓', 0, 1),
+  ('cat_transfer', 'Transfers', '↔️', 0, 1),
+  ('cat_fees', 'Fees & Interest', '⚠️', 0, 1),
+  ('cat_other', 'Other', '❔', 0, 1);
