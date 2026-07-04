@@ -88,5 +88,5 @@ export async function syncMxMember(
     .bind(member.id)
     .run();
 
-  await recomputeNetWorth(db);
+  await recomputeNetWorth(db, { force: true });
 }

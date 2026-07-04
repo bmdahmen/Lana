@@ -1,11 +1,48 @@
 import { getPlaidClient } from "@/lib/plaid";
 import { applyCategoryRules, defaultCategoryFor, type CategoryRule } from "@/lib/categorize";
 import { newId } from "@/lib/db";
+import { recomputeMetalAccountBalances } from "@/lib/spot-price";
+import { recomputeRealEstateAccountBalances } from "@/lib/zillow";
 
 interface PlaidItemRow {
   id: string;
   access_token: string;
   cursor: string | null;
+}
+
+const RECOMPUTE_THROTTLE_MS = 4 * 60 * 60 * 1000;
+
+async function isRecomputeStale(db: D1Database): Promise<boolean> {
+  const row = await db
+    .prepare("SELECT last_recomputed_at FROM recompute_state WHERE id = 1")
+    .first<{ last_recomputed_at: number }>();
+  return !row || Date.now() - row.last_recomputed_at > RECOMPUTE_THROTTLE_MS;
+}
+
+async function markRecomputed(db: D1Database): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO recompute_state (id, last_recomputed_at) VALUES (1, ?)
+       ON CONFLICT(id) DO UPDATE SET last_recomputed_at = excluded.last_recomputed_at`
+    )
+    .bind(Date.now())
+    .run();
+}
+
+/**
+ * Refreshes metal, real-estate, and net-worth balances together, at most
+ * once per throttle window. Pages call this on every render, so without the
+ * throttle each visit would re-run this whole pipeline (including sequential
+ * writes) even when nothing has changed since the last visit.
+ */
+export async function recomputeAccountBalances(
+  db: D1Database,
+  options?: { force?: boolean }
+): Promise<void> {
+  if (!options?.force && !(await isRecomputeStale(db))) return;
+
+  await Promise.all([recomputeMetalAccountBalances(db), recomputeRealEstateAccountBalances(db)]);
+  await recomputeNetWorth(db, { force: true });
 }
 
 function accountIsAsset(type: string): boolean {
@@ -122,10 +159,15 @@ export async function syncPlaidItem(db: D1Database, item: PlaidItemRow): Promise
       .run();
   }
 
-  await recomputeNetWorth(db);
+  await recomputeNetWorth(db, { force: true });
 }
 
-export async function recomputeNetWorth(db: D1Database): Promise<void> {
+export async function recomputeNetWorth(
+  db: D1Database,
+  options?: { force?: boolean }
+): Promise<void> {
+  if (!options?.force && !(await isRecomputeStale(db))) return;
+
   const today = new Date().toISOString().slice(0, 10);
 
   const accounts = await db
@@ -139,6 +181,7 @@ export async function recomputeNetWorth(db: D1Database): Promise<void> {
 
   let totalAssets = 0;
   let totalLiabilities = 0;
+  const statements = [];
 
   for (const acc of accounts.results ?? []) {
     const balance = acc.current_balance ?? 0;
@@ -148,29 +191,34 @@ export async function recomputeNetWorth(db: D1Database): Promise<void> {
       totalLiabilities += balance;
     }
 
-    await db
-      .prepare(
-        `INSERT INTO account_balance_history (id, account_id, date, current_balance)
-         VALUES (?, ?, ?, ?)
-         ON CONFLICT(account_id, date) DO UPDATE SET current_balance = excluded.current_balance`
-      )
-      .bind(newId("bal"), acc.id, today, balance)
-      .run();
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO account_balance_history (id, account_id, date, current_balance)
+           VALUES (?, ?, ?, ?)
+           ON CONFLICT(account_id, date) DO UPDATE SET current_balance = excluded.current_balance`
+        )
+        .bind(newId("bal"), acc.id, today, balance)
+    );
   }
 
   const netWorth = totalAssets - totalLiabilities;
 
-  await db
-    .prepare(
-      `INSERT INTO net_worth_snapshot (id, date, total_assets, total_liabilities, net_worth)
-       VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(date) DO UPDATE SET
-         total_assets = excluded.total_assets,
-         total_liabilities = excluded.total_liabilities,
-         net_worth = excluded.net_worth`
-    )
-    .bind(newId("nws"), today, totalAssets, totalLiabilities, netWorth)
-    .run();
+  statements.push(
+    db
+      .prepare(
+        `INSERT INTO net_worth_snapshot (id, date, total_assets, total_liabilities, net_worth)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(date) DO UPDATE SET
+           total_assets = excluded.total_assets,
+           total_liabilities = excluded.total_liabilities,
+           net_worth = excluded.net_worth`
+      )
+      .bind(newId("nws"), today, totalAssets, totalLiabilities, netWorth)
+  );
+
+  await db.batch(statements);
+  await markRecomputed(db);
 }
 
 export { accountIsAsset };

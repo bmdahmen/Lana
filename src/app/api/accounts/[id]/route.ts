@@ -108,7 +108,7 @@ export async function PATCH(
       .prepare(`UPDATE account SET ${updates.join(", ")} WHERE id = ?`)
       .bind(...bindings, id)
       .run();
-    await recomputeNetWorth(db);
+    await recomputeNetWorth(db, { force: true });
   }
 
   return NextResponse.json({ ok: true });
