@@ -1,0 +1,23 @@
+name: Sync Era accounts into Lana
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run Era sync
+        env:
+          ERA_API_KEY: ${{ secrets.ERA_API_KEY }}
+          LANA_URL: ${{ secrets.LANA_URL }}
+          LANA_SYNC_SECRET: ${{ secrets.LANA_SYNC_SECRET }}
+        run: node scripts/era-sync.mjs

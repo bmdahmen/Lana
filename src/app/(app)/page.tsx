@@ -5,7 +5,6 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { NetWorthByClassChart } from "@/components/net-worth-by-class-chart";
 import { LinkAccountButton } from "@/components/link-account-button";
 import { LinkMxAccountButton } from "@/components/link-mx-account-button";
-import { EraSyncButton } from "@/components/era-sync-button";
 
 interface Snapshot {
   date: string;
@@ -64,7 +63,6 @@ export default async function DashboardPage() {
         <div className="flex gap-2">
           <LinkAccountButton />
           <LinkMxAccountButton />
-          <EraSyncButton />
         </div>
       </div>
 
