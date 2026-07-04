@@ -105,10 +105,12 @@ latest cached spot price.
 The "Add manual account" flow also special-cases the **Real Estate** category:
 instead of entering a dollar balance, you enter a property address. The
 balance is set from Zillow's Zestimate for that address and kept current
-automatically — `src/lib/zillow.ts` looks up the Zestimate through a RapidAPI
-Zillow data provider (`zillow-com1.p.rapidapi.com` by default), caches it on
-the account row, and refreshes at most once a day. The dashboard and Accounts
-page both trigger a refresh check on load, so no separate cron job is needed.
+automatically — `src/lib/zillow.ts` resolves the address to a Zillow property
+ID via the `propertyExtendedSearch` endpoint, then fetches its Zestimate from
+`/property?zpid=...`, through a RapidAPI Zillow data provider
+(`zillow-com1.p.rapidapi.com` by default). The result is cached on the
+account row and refreshed at most once a day. The dashboard and Accounts page
+both trigger a refresh check on load, so no separate cron job is needed.
 
 Set these to enable it:
 
