@@ -2,20 +2,20 @@
 -- "La Lana" spreadsheet (Oct 2015 - Jun 2026).
 --
 -- These are category-level rollups (not per-institution accounts) so they
--- don't collide with real accounts later linked via Plaid/MX. Each holds
--- current_balance = 0 so they never contribute to live net worth totals
--- going forward -- only their historical account_balance_history rows,
--- inserted below, feed the net-worth-by-category chart.
+-- don't collide with real accounts later linked via Plaid/MX. current_balance
+-- is seeded to the last known (Jun 2026) value from the sheet, same as any
+-- other manual account, so it carries forward flat instead of dropping to
+-- zero on "today" until someone edits it via the Accounts page.
 
 INSERT INTO account (id, name, type, current_balance, is_manual, is_asset, asset_class)
 VALUES
-  ('acct_lalana_cash', 'Historical Cash (La Lana)', 'other', 0.00, 1, 1, 'cash'),
-  ('acct_lalana_brokerage', 'Historical Brokerage (La Lana)', 'other', 0.00, 1, 1, 'brokerage'),
-  ('acct_lalana_retirement', 'Historical Retirement (La Lana)', 'other', 0.00, 1, 1, 'retirement'),
-  ('acct_lalana_crypto', 'Historical Crypto (La Lana)', 'other', 0.00, 1, 1, 'crypto'),
-  ('acct_lalana_real_estate', 'Historical Real Estate (La Lana)', 'other', 0.00, 1, 1, 'real_estate'),
-  ('acct_lalana_hard_asset', 'Historical Hard Assets (La Lana)', 'other', 0.00, 1, 1, 'hard_asset'),
-  ('acct_lalana_liabilities', 'Historical Liabilities (La Lana)', 'other', 0.00, 1, 0, 'liabilities')
+  ('acct_lalana_cash', 'Historical Cash (La Lana)', 'other', 93514.00, 1, 1, 'cash'),
+  ('acct_lalana_brokerage', 'Historical Brokerage (La Lana)', 'other', 4643689.74, 1, 1, 'brokerage'),
+  ('acct_lalana_retirement', 'Historical Retirement (La Lana)', 'other', 1263816.00, 1, 1, 'retirement'),
+  ('acct_lalana_crypto', 'Historical Crypto (La Lana)', 'other', 17592.00, 1, 1, 'crypto'),
+  ('acct_lalana_real_estate', 'Historical Real Estate (La Lana)', 'other', 1264500.00, 1, 1, 'real_estate'),
+  ('acct_lalana_hard_asset', 'Historical Hard Assets (La Lana)', 'other', 272120.31, 1, 1, 'hard_asset'),
+  ('acct_lalana_liabilities', 'Historical Liabilities (La Lana)', 'other', 690000.00, 1, 0, 'liabilities')
 ON CONFLICT(id) DO UPDATE SET current_balance = excluded.current_balance;
 
 INSERT INTO account_balance_history (id, account_id, date, current_balance)
