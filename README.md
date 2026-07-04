@@ -100,6 +100,27 @@ load, so no separate cron job is needed. Use "Update ounces" on the Accounts
 page to change the quantity later; the dollar value recalculates from the
 latest cached spot price.
 
+## Real estate (Zillow Zestimate)
+
+The "Add manual account" flow also special-cases the **Real Estate** category:
+instead of entering a dollar balance, you enter a property address. The
+balance is set from Zillow's Zestimate for that address and kept current
+automatically — `src/lib/zillow.ts` looks up the Zestimate through a RapidAPI
+Zillow data provider (`zillow-com1.p.rapidapi.com` by default), caches it on
+the account row, and refreshes at most once a day. The dashboard and Accounts
+page both trigger a refresh check on load, so no separate cron job is needed.
+
+Set these to enable it:
+
+- `ZILLOW_RAPIDAPI_KEY` — your RapidAPI key, required.
+- `ZILLOW_RAPIDAPI_HOST` — optional, defaults to `zillow-com1.p.rapidapi.com`.
+  Override this if you're using a different Zillow data provider on RapidAPI;
+  you may also need to adjust the response parsing in `src/lib/zillow.ts` if
+  that provider nests the `zestimate` field differently.
+
+Use "Update address" on the Accounts page to correct the address or force a
+fresh lookup later.
+
 ## Database
 
 Schema lives in `migrations/*.sql`, applied in order. The Cloudflare D1 database

@@ -2,6 +2,7 @@ import { getDB } from "@/lib/db";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { ASSET_CLASSES, type PreciousMetal } from "@/lib/asset-classes";
 import { recomputeMetalAccountBalances } from "@/lib/spot-price";
+import { recomputeRealEstateAccountBalances } from "@/lib/zillow";
 import { AddManualAccountButton } from "@/components/add-manual-account-button";
 import { AccountRowActions } from "@/components/account-row-actions";
 import { LinkMxAccountButton } from "@/components/link-mx-account-button";
@@ -22,6 +23,7 @@ interface AccountRow {
   metal_troy_oz: number | null;
   relevant_from: string | null;
   relevant_until: string | null;
+  property_address: string | null;
 }
 
 const CLASS_LABEL = new Map<string, string>(ASSET_CLASSES.map((c) => [c.id, c.label]));
@@ -29,11 +31,13 @@ const CLASS_LABEL = new Map<string, string>(ASSET_CLASSES.map((c) => [c.id, c.la
 export default async function AccountsPage() {
   const db = await getDB();
   await recomputeMetalAccountBalances(db);
+  await recomputeRealEstateAccountBalances(db);
   const result = await db
     .prepare(
       `SELECT a.id, a.name, a.official_name, a.mask, a.current_balance, a.is_manual, a.is_hidden,
               a.asset_class, p.institution_name, p.status as item_status,
-              a.precious_metal, a.metal_troy_oz, a.relevant_from, a.relevant_until
+              a.precious_metal, a.metal_troy_oz, a.relevant_from, a.relevant_until,
+              a.property_address
        FROM account a
        LEFT JOIN plaid_item p ON p.id = a.plaid_item_id
        WHERE a.is_closed = 0
@@ -85,6 +89,9 @@ export default async function AccountsPage() {
                         {formatDate(acc.relevant_until)}
                       </p>
                     )}
+                    {acc.property_address && (
+                      <p className="text-xs text-zinc-500">{acc.property_address}</p>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                     {CLASS_LABEL.get(acc.asset_class) ?? acc.asset_class}
@@ -107,6 +114,7 @@ export default async function AccountsPage() {
                       isManual={!!acc.is_manual}
                       preciousMetal={acc.precious_metal}
                       isHistorical={!!acc.relevant_until}
+                      propertyAddress={acc.property_address}
                     />
                   </td>
                 </tr>
