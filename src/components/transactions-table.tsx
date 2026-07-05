@@ -85,6 +85,8 @@ export function TransactionsTable({
   const [ruleDraft, setRuleDraft] = useState<RuleDraft | null>(null);
   const [ruleSubmitting, setRuleSubmitting] = useState(false);
   const [ruleMessage, setRuleMessage] = useState<string | null>(null);
+  // Which mobile row's swipe-revealed category editor is expanded, if any.
+  const [categoryEditId, setCategoryEditId] = useState<string | null>(null);
 
   const buildParams = useCallback(
     (offset: number) => {
@@ -353,40 +355,85 @@ export function TransactionsTable({
 
       {transactions.length > 0 && (
         <>
-          {/* Mobile: card list */}
+          {/* Mobile: card list. Each row is its own horizontal scroll-snap
+              strip -- swiping left reveals the category-edit/create-rule
+              icons instead of spending a whole extra row on them. */}
           <ul className="flex flex-col gap-1.5 md:hidden">
             {transactions.map((tx) => (
               <li
                 key={tx.id}
-                className="rounded-xl border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-950"
+                className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                      {tx.merchant_name ?? tx.name}
-                      {tx.pending === 1 && (
-                        <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-normal text-zinc-500 dark:bg-zinc-800">
-                          Pending
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-xs text-zinc-500">
-                      {tx.account_name} · {formatDate(tx.date)}
-                    </p>
+                <div className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto">
+                  <div className="flex w-full shrink-0 snap-start items-start gap-2.5 px-3 py-2.5">
+                    {!hideCategoryColumn && (
+                      <span className="mt-0.5 shrink-0 text-lg leading-none" aria-hidden>
+                        {tx.category_icon ?? "❔"}
+                      </span>
+                    )}
+                    <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                          {tx.merchant_name ?? tx.name}
+                          {tx.pending === 1 && (
+                            <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-normal text-zinc-500 dark:bg-zinc-800">
+                              Pending
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-xs text-zinc-500">
+                          {tx.account_name} · {formatDate(tx.date)}
+                        </p>
+                      </div>
+                      <span
+                        className="shrink-0 font-medium"
+                        style={tx.amount > 0 ? undefined : { color: "var(--positive)" }}
+                      >
+                        {tx.amount > 0 ? "-" : "+"}
+                        {formatCurrency(Math.abs(tx.amount))}
+                      </span>
+                    </div>
                   </div>
-                  <span
-                    className="shrink-0 font-medium"
-                    style={tx.amount > 0 ? undefined : { color: "var(--positive)" }}
-                  >
-                    {tx.amount > 0 ? "-" : "+"}
-                    {formatCurrency(Math.abs(tx.amount))}
-                  </span>
+                  {!hideCategoryColumn && (
+                    <div className="flex shrink-0 snap-end items-center gap-1 border-l border-zinc-100 px-3 dark:border-zinc-900">
+                      <button
+                        type="button"
+                        aria-label="Edit category"
+                        onClick={() => {
+                          setRuleDraft(null);
+                          setCategoryEditId(categoryEditId === tx.id ? null : tx.id);
+                        }}
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"
+                      >
+                        <TagIcon />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Create rule"
+                        onClick={() => {
+                          setCategoryEditId(null);
+                          if (ruleDraft?.txId === tx.id) {
+                            setRuleDraft(null);
+                          } else {
+                            openRuleForm(tx);
+                          }
+                        }}
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"
+                      >
+                        <PlusIcon />
+                      </button>
+                    </div>
+                  )}
                 </div>
-                {!hideCategoryColumn && (
-                  <div className="mt-1.5 flex items-center gap-2">
+                {!hideCategoryColumn && categoryEditId === tx.id && (
+                  <div className="border-t border-zinc-100 px-3 py-2 dark:border-zinc-900">
                     <select
+                      autoFocus
                       value={tx.category_id ?? ""}
-                      onChange={(e) => updateCategory(tx.id, e.target.value)}
+                      onChange={(e) => {
+                        updateCategory(tx.id, e.target.value);
+                        setCategoryEditId(null);
+                      }}
                       className="w-full rounded-md border border-zinc-300 bg-transparent px-2 py-1 text-xs outline-none dark:border-zinc-700"
                     >
                       {categories.map((c) => (
@@ -395,18 +442,10 @@ export function TransactionsTable({
                         </option>
                       ))}
                     </select>
-                    <button
-                      onClick={() =>
-                        ruleDraft?.txId === tx.id ? setRuleDraft(null) : openRuleForm(tx)
-                      }
-                      className="shrink-0 whitespace-nowrap text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
-                    >
-                      + rule
-                    </button>
                   </div>
                 )}
                 {!hideCategoryColumn && ruleDraft?.txId === tx.id && (
-                  <div className="mt-2">
+                  <div className="border-t border-zinc-100 px-3 py-2 dark:border-zinc-900">
                     <RuleDraftForm />
                   </div>
                 )}
@@ -509,6 +548,24 @@ function SearchIcon() {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="11" cy="11" r="7" />
       <path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+}
+
+function TagIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12.6 2.9 3 12.5V21h8.5l9.6-9.6a2 2 0 0 0 0-2.8l-5.7-5.7a2 2 0 0 0-2.8 0Z" />
+      <circle cx="8.5" cy="15.5" r="1.25" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
     </svg>
   );
 }
