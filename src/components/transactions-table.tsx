@@ -33,17 +33,29 @@ interface RuleDraft {
   categoryId: string;
 }
 
-export function TransactionsTable({ categories }: { categories: Category[] }) {
+export function TransactionsTable({
+  categories,
+  fixedCategoryId,
+  from,
+  to,
+}: {
+  categories: Category[];
+  /** When set, results are locked to this category and the category filter dropdown is hidden. */
+  fixedCategoryId?: string;
+  /** Optional fixed date range (inclusive), e.g. when embedded for a single month. */
+  from?: string;
+  to?: string;
+}) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState(fixedCategoryId ?? "");
   const [loading, setLoading] = useState(true);
   const [ruleDraft, setRuleDraft] = useState<RuleDraft | null>(null);
   const [ruleSubmitting, setRuleSubmitting] = useState(false);
   const [ruleMessage, setRuleMessage] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const isDefaultView = !search && !categoryFilter;
+    const isDefaultView = !search && !categoryFilter && !from && !to;
 
     if (isDefaultView) {
       const cached = getCachedFetch<Transaction[]>(DEFAULT_TRANSACTIONS_CACHE_KEY);
@@ -59,6 +71,8 @@ export function TransactionsTable({ categories }: { categories: Category[] }) {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
       if (categoryFilter) params.set("categoryId", categoryFilter);
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
       const res = await fetch(`/api/transactions?${params.toString()}`);
       const data = (await res.json()) as { transactions?: Transaction[] };
       const transactions = data.transactions ?? [];
@@ -69,7 +83,7 @@ export function TransactionsTable({ categories }: { categories: Category[] }) {
     } finally {
       setLoading(false);
     }
-  }, [search, categoryFilter]);
+  }, [search, categoryFilter, from, to]);
 
   useEffect(() => {
     const timeout = setTimeout(load, 250);
@@ -218,18 +232,20 @@ export function TransactionsTable({ categories }: { categories: Category[] }) {
           placeholder="Search transactions..."
           className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 sm:w-64 dark:border-zinc-700 dark:bg-zinc-900"
         />
-        <select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 sm:w-auto dark:border-zinc-700 dark:bg-zinc-900"
-        >
-          <option value="">All categories</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.icon} {c.name}
-            </option>
-          ))}
-        </select>
+        {!fixedCategoryId && (
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 sm:w-auto dark:border-zinc-700 dark:bg-zinc-900"
+          >
+            <option value="">All categories</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.icon} {c.name}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {ruleMessage && <p className="text-sm text-zinc-500">{ruleMessage}</p>}

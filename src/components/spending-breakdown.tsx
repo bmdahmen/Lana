@@ -1,7 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatCurrency } from "@/lib/format";
+import { CategoryTransactionsModal } from "@/components/category-transactions-modal";
+
+const MONTHS_BACK = 12;
 
 interface BreakdownRow {
   category_id: string;
@@ -11,24 +14,64 @@ interface BreakdownRow {
   count: number;
 }
 
+interface Category {
+  id: string;
+  name: string;
+  icon: string | null;
+}
+
+interface MonthOption {
+  from: string;
+  to: string;
+  label: string;
+}
+
+function toISODate(year: number, month: number, day: number): string {
+  return new Date(year, month, day).toISOString().slice(0, 10);
+}
+
+function buildMonthOptions(count: number): MonthOption[] {
+  const now = new Date();
+  return Array.from({ length: count }, (_, i) => {
+    const year = now.getFullYear();
+    const month = now.getMonth() - i;
+    const start = new Date(year, month, 1);
+    return {
+      from: toISODate(start.getFullYear(), start.getMonth(), 1),
+      to: toISODate(start.getFullYear(), start.getMonth() + 1, 0),
+      label: start.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+    };
+  });
+}
+
 export function SpendingBreakdown({
   initialBreakdown,
-  initialFrom,
+  categories,
 }: {
   initialBreakdown: BreakdownRow[];
-  initialFrom: string;
+  categories: Category[];
 }) {
-  const [from, setFrom] = useState(initialFrom);
-  const [to, setTo] = useState("");
+  const monthOptions = useMemo(() => buildMonthOptions(MONTHS_BACK), []);
+  const [selectedMonth, setSelectedMonth] = useState(0);
+  const { from, to, label } = monthOptions[selectedMonth];
   const [breakdown, setBreakdown] = useState(initialBreakdown);
+  const [loading, setLoading] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<BreakdownRow | null>(null);
+  const requestIdRef = useRef(0);
 
   const load = useCallback(async () => {
-    const params = new URLSearchParams();
-    if (from) params.set("from", from);
-    if (to) params.set("to", to);
-    const res = await fetch(`/api/insights/spending?${params.toString()}`);
-    const data = (await res.json()) as { breakdown?: BreakdownRow[] };
-    setBreakdown(data.breakdown ?? []);
+    const requestId = ++requestIdRef.current;
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ from, to });
+      const res = await fetch(`/api/insights/spending?${params.toString()}`);
+      const data = (await res.json()) as { breakdown?: BreakdownRow[] };
+      // Ignore stale responses from a request superseded by a later month switch.
+      if (requestId !== requestIdRef.current) return;
+      setBreakdown(data.breakdown ?? []);
+    } finally {
+      if (requestId === requestIdRef.current) setLoading(false);
+    }
   }, [from, to]);
 
   useEffect(() => {
@@ -41,63 +84,81 @@ export function SpendingBreakdown({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex gap-3">
-        <div className="flex-1">
-          <label className="mb-1 block text-xs font-medium text-zinc-500">From</label>
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
-          />
-        </div>
-        <div className="flex-1">
-          <label className="mb-1 block text-xs font-medium text-zinc-500">To</label>
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
-          />
-        </div>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {monthOptions.map((m, i) => (
+          <button
+            key={m.from}
+            type="button"
+            onClick={() => setSelectedMonth(i)}
+            className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+              i === selectedMonth
+                ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900"
+                : "border border-zinc-300 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900"
+            }`}
+          >
+            {i === 0 ? "This month" : m.label}
+          </button>
+        ))}
       </div>
 
       <div className="rounded-xl border border-zinc-200 bg-white p-4 sm:p-6 dark:border-zinc-800 dark:bg-zinc-950">
         <div className="mb-6 flex items-baseline justify-between">
-          <h2 className="text-sm font-medium text-zinc-500">Total spending</h2>
+          <h2 className="text-sm font-medium text-zinc-500">Total spending &middot; {label}</h2>
           <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
             {formatCurrency(total)}
           </p>
         </div>
 
-        {breakdown.length === 0 ? (
+        {!loading && breakdown.length === 0 ? (
           <p className="py-8 text-center text-sm text-zinc-500">No spending in this period.</p>
         ) : (
           <ul className="flex flex-col gap-4">
             {breakdown.map((row) => (
               <li key={row.category_id}>
-                <div className="mb-1 flex items-center justify-between text-sm">
-                  <span className="font-medium text-zinc-900 dark:text-zinc-50">
-                    {row.category_icon} {row.category_name}
-                  </span>
-                  <span className="text-zinc-600 dark:text-zinc-400">
-                    {formatCurrency(row.total)}
-                  </span>
-                </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-900">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${(row.total / max) * 100}%`,
-                      backgroundColor: "var(--chart-net-worth)",
-                    }}
-                  />
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveCategory(row)}
+                  className="group w-full rounded-md text-left"
+                >
+                  <div className="mb-1 flex items-center justify-between text-sm">
+                    <span className="font-medium text-zinc-900 group-hover:underline dark:text-zinc-50">
+                      {row.category_icon} {row.category_name}
+                    </span>
+                    <span className="text-zinc-600 group-hover:underline dark:text-zinc-400">
+                      {formatCurrency(row.total)}
+                    </span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-900">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${(row.total / max) * 100}%`,
+                        backgroundColor: "var(--chart-net-worth)",
+                      }}
+                    />
+                  </div>
+                </button>
               </li>
             ))}
           </ul>
         )}
       </div>
+
+      {activeCategory && (
+        <CategoryTransactionsModal
+          categoryId={activeCategory.category_id}
+          categoryName={activeCategory.category_name}
+          categoryIcon={activeCategory.category_icon}
+          monthLabel={label}
+          from={from}
+          to={to}
+          categories={categories}
+          onClose={() => {
+            setActiveCategory(null);
+            load();
+          }}
+        />
+      )}
     </div>
   );
 }
