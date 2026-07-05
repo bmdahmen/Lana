@@ -39,7 +39,7 @@ export function CategoryBreakdown({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="no-scrollbar flex gap-3 overflow-x-auto px-4 sm:px-8">
+      <div className="grid grid-cols-2 gap-2 px-4 sm:grid-cols-3 sm:px-8">
         {classes.map((cls) => {
           const isActive = expanded === cls.id;
           return (
@@ -48,20 +48,20 @@ export function CategoryBreakdown({
               onClick={() => setExpanded(isActive ? null : cls.id)}
               aria-expanded={isActive}
               className={clsx(
-                "flex min-w-[132px] shrink-0 flex-col gap-2 rounded-xl border p-4 text-left transition-colors",
+                "flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left transition-colors",
                 isActive
                   ? "border-zinc-900 bg-zinc-50 dark:border-zinc-50 dark:bg-zinc-900"
                   : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950"
               )}
             >
-              <span className="flex items-center gap-2 text-xs font-medium text-zinc-500">
+              <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-zinc-500">
                 <span
-                  className="h-2 w-2 rounded-full"
+                  className="h-2 w-2 shrink-0 rounded-full"
                   style={{ backgroundColor: `var(${cls.colorVar})` }}
                 />
-                {cls.label}
+                <span className="truncate">{cls.label}</span>
               </span>
-              <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+              <span className="shrink-0 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
                 {formatCurrency(cls.value)}
               </span>
             </button>

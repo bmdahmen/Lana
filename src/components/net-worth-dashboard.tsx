@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import clsx from "clsx";
 import { NetWorthByClassChart } from "@/components/net-worth-by-class-chart";
 import { CategoryBreakdown } from "@/components/category-breakdown";
@@ -114,7 +115,15 @@ export function NetWorthDashboard({
 
       {classBreakdown.length > 0 && (
         <section className="pb-6">
-          <h2 className="mb-3 px-4 text-sm font-medium text-zinc-500 sm:px-8">By category</h2>
+          <div className="mb-3 flex items-baseline justify-between px-4 sm:px-8">
+            <h2 className="text-sm font-medium text-zinc-500">By category</h2>
+            <Link
+              href="/net-worth"
+              className="text-xs font-medium text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+            >
+              Explore by account →
+            </Link>
+          </div>
           <CategoryBreakdown classes={classBreakdown} accounts={accounts} />
         </section>
       )}
