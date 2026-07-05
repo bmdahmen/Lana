@@ -5,6 +5,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { getCachedFetch, setCachedFetch, invalidateCachedFetch } from "@/lib/client-cache";
 
 const DEFAULT_TRANSACTIONS_CACHE_KEY = "transactions:default";
+const PAGE_SIZE = 100;
 
 interface Category {
   id: string;
@@ -50,9 +51,25 @@ export function TransactionsTable({
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState(fixedCategoryId ?? "");
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [ruleDraft, setRuleDraft] = useState<RuleDraft | null>(null);
   const [ruleSubmitting, setRuleSubmitting] = useState(false);
   const [ruleMessage, setRuleMessage] = useState<string | null>(null);
+
+  const buildParams = useCallback(
+    (offset: number) => {
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (categoryFilter) params.set("categoryId", categoryFilter);
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+      params.set("limit", String(PAGE_SIZE));
+      params.set("offset", String(offset));
+      return params;
+    },
+    [search, categoryFilter, from, to]
+  );
 
   const load = useCallback(async () => {
     const isDefaultView = !search && !categoryFilter && !from && !to;
@@ -61,6 +78,7 @@ export function TransactionsTable({
       const cached = getCachedFetch<Transaction[]>(DEFAULT_TRANSACTIONS_CACHE_KEY);
       if (cached) {
         setTransactions(cached);
+        setHasMore(cached.length === PAGE_SIZE);
         setLoading(false);
         return;
       }
@@ -68,27 +86,36 @@ export function TransactionsTable({
 
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (search) params.set("search", search);
-      if (categoryFilter) params.set("categoryId", categoryFilter);
-      if (from) params.set("from", from);
-      if (to) params.set("to", to);
-      const res = await fetch(`/api/transactions?${params.toString()}`);
+      const res = await fetch(`/api/transactions?${buildParams(0).toString()}`);
       const data = (await res.json()) as { transactions?: Transaction[] };
-      const transactions = data.transactions ?? [];
-      setTransactions(transactions);
+      const results = data.transactions ?? [];
+      setTransactions(results);
+      setHasMore(results.length === PAGE_SIZE);
       if (isDefaultView) {
-        setCachedFetch(DEFAULT_TRANSACTIONS_CACHE_KEY, transactions);
+        setCachedFetch(DEFAULT_TRANSACTIONS_CACHE_KEY, results);
       }
     } finally {
       setLoading(false);
     }
-  }, [search, categoryFilter, from, to]);
+  }, [search, categoryFilter, from, to, buildParams]);
 
   useEffect(() => {
     const timeout = setTimeout(load, 250);
     return () => clearTimeout(timeout);
   }, [load]);
+
+  async function loadMore() {
+    setLoadingMore(true);
+    try {
+      const res = await fetch(`/api/transactions?${buildParams(transactions.length).toString()}`);
+      const data = (await res.json()) as { transactions?: Transaction[] };
+      const results = data.transactions ?? [];
+      setTransactions((prev) => [...prev, ...results]);
+      setHasMore(results.length === PAGE_SIZE);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   async function updateCategory(id: string, categoryId: string) {
     setTransactions((prev) =>
@@ -390,6 +417,16 @@ export function TransactionsTable({
             </table>
           </div>
         </>
+      )}
+
+      {hasMore && (
+        <button
+          onClick={loadMore}
+          disabled={loadingMore}
+          className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
+        >
+          {loadingMore ? "Loading..." : "Load more"}
+        </button>
       )}
     </div>
   );
