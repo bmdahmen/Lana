@@ -24,7 +24,10 @@ export async function middleware(request: NextRequest) {
     PUBLIC_PATHS.includes(pathname) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/plaid/webhook") ||
-    pathname.startsWith("/api/mx/webhook")
+    pathname.startsWith("/api/mx/webhook") ||
+    // Guarded by its own CRON_SECRET check (see route.ts), not session auth --
+    // the Worker's scheduled() handler calls it with no user session.
+    pathname.startsWith("/api/cron/")
   ) {
     return NextResponse.next();
   }
