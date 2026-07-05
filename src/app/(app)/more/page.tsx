@@ -3,7 +3,6 @@ import { LogoutButton } from "@/components/logout-button";
 
 const LINKS = [
   { href: "/net-worth", label: "Net Worth breakdown", description: "Full history by category" },
-  { href: "/rules", label: "Categorization rules", description: "Auto-tag transactions" },
 ];
 
 export default function MorePage() {

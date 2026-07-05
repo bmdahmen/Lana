@@ -20,7 +20,6 @@ const SIDE_LINKS = [
   { href: "/accounts", label: "Accounts" },
   { href: "/spending", label: "Spending" },
   { href: "/investments", label: "Investments" },
-  { href: "/rules", label: "Rules" },
 ];
 
 function isActive(pathname: string, href: string) {
