@@ -56,6 +56,26 @@ async function computeNetWorthSeries(db: D1Database): Promise<NetWorthByClassPoi
     )
     .all<{ date: string; asset_class: AssetClass; total: number }>();
 
+  // A class stops getting new rows once every account that ever contributed
+  // to it has passed its relevant_until with nothing open-ended left behind
+  // (e.g. a relevancy-windowed account with no live replacement). Track the
+  // latest such expiry per class so the carry-forward below can drop the
+  // value to zero there instead of repeating a stale balance forever.
+  const expiryResult = await db
+    .prepare(
+      `SELECT asset_class,
+              MAX(relevant_until) as expires_at,
+              SUM(CASE WHEN relevant_until IS NULL THEN 1 ELSE 0 END) as open_ended_count
+       FROM account
+       WHERE is_closed = 0 AND is_hidden = 0
+       GROUP BY asset_class`
+    )
+    .all<{ asset_class: AssetClass; expires_at: string | null; open_ended_count: number }>();
+  const classExpiry = new Map<string, string | null>();
+  for (const row of expiryResult.results ?? []) {
+    classExpiry.set(row.asset_class, row.open_ended_count > 0 ? null : row.expires_at);
+  }
+
   const byDate = new Map<string, Record<string, number>>();
   for (const row of result.results ?? []) {
     const bucket = byDate.get(row.date) ?? {};
@@ -72,8 +92,12 @@ async function computeNetWorthSeries(db: D1Database): Promise<NetWorthByClassPoi
     let netWorth = 0;
     for (const { id } of ASSET_CLASSES) {
       // Carry forward the last known total when a class has no row for this
-      // date (e.g. its account stopped syncing) instead of dropping to zero.
-      const value = bucket[id] ?? lastKnown[id] ?? 0;
+      // date (e.g. its account stopped syncing) instead of dropping to zero
+      // -- unless every contributing account for this class has expired as
+      // of this date, in which case the value should actually be gone.
+      const expiry = classExpiry.get(id);
+      const expired = expiry != null && date > expiry;
+      const value = bucket[id] ?? (expired ? 0 : lastKnown[id] ?? 0);
       lastKnown[id] = value;
       point[id] = value;
       netWorth += id === "liabilities" ? -value : value;
