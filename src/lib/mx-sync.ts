@@ -1,5 +1,10 @@
 import { listMemberAccounts, listMemberTransactions } from "@/lib/mx";
-import { applyCategoryRules, defaultCategoryFromLabel, type CategoryRule } from "@/lib/categorize";
+import {
+  applyCategoryRules,
+  defaultCategoryFromLabel,
+  isInvestmentAssetClass,
+  type CategoryRule,
+} from "@/lib/categorize";
 import { newId } from "@/lib/db";
 import { recomputeNetWorth } from "@/lib/sync";
 
@@ -26,11 +31,11 @@ export async function syncMxMember(
   }
 
   const accountRows = await db
-    .prepare("SELECT id, mx_account_guid FROM account WHERE mx_member_id = ?")
+    .prepare("SELECT id, mx_account_guid, asset_class FROM account WHERE mx_member_id = ?")
     .bind(member.id)
-    .all<{ id: string; mx_account_guid: string }>();
-  const accountIdByMxGuid = new Map(
-    (accountRows.results ?? []).map((row) => [row.mx_account_guid, row.id])
+    .all<{ id: string; mx_account_guid: string; asset_class: string }>();
+  const accountByMxGuid = new Map(
+    (accountRows.results ?? []).map((row) => [row.mx_account_guid, row])
   );
 
   const rulesResult = await db
@@ -43,8 +48,9 @@ export async function syncMxMember(
   const transactions = await listMemberTransactions(mxUserGuid, member.mx_member_guid);
 
   for (const tx of transactions) {
-    const accountId = accountIdByMxGuid.get(tx.account_guid);
-    if (!accountId) continue;
+    const account = accountByMxGuid.get(tx.account_guid);
+    if (!account) continue;
+    const accountId = account.id;
 
     const signedAmount = tx.type === "DEBIT" ? Math.abs(tx.amount) : -Math.abs(tx.amount);
 
@@ -52,7 +58,9 @@ export async function syncMxMember(
       name: tx.description,
       merchant_name: null,
     });
-    const categoryId = ruleMatch ?? defaultCategoryFromLabel(tx.category);
+    const categoryId = isInvestmentAssetClass(account.asset_class)
+      ? "cat_transfer"
+      : ruleMatch ?? defaultCategoryFromLabel(tx.category);
 
     await db
       .prepare(

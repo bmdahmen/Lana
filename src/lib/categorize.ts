@@ -26,6 +26,14 @@ const DETAILED_CATEGORY_MAP: Record<string, string> = {
   LOAN_PAYMENTS_CREDIT_CARD_PAYMENT: "cat_transfer",
 };
 
+// Brokerage and retirement accounts only ever see buys/sells/dividends,
+// contributions, and cash moved in or out from other accounts -- none of
+// that is spending, so it's always a transfer regardless of what Plaid/MX
+// call it.
+export function isInvestmentAssetClass(assetClass: string | null | undefined): boolean {
+  return assetClass === "brokerage" || assetClass === "retirement";
+}
+
 export function defaultCategoryFor(
   primary: string | null | undefined,
   detailed: string | null | undefined

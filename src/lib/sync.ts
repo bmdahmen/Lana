@@ -1,5 +1,5 @@
 import { getPlaidClient } from "@/lib/plaid";
-import { applyCategoryRules, defaultCategoryFor, type CategoryRule } from "@/lib/categorize";
+import { applyCategoryRules, defaultCategoryFor, isInvestmentAssetClass, type CategoryRule } from "@/lib/categorize";
 import { newId } from "@/lib/db";
 import { recomputeSpotPriceAccountBalances } from "@/lib/spot-price";
 import { recomputeRealEstateAccountBalances } from "@/lib/zillow";
@@ -74,11 +74,11 @@ export async function syncPlaidItem(db: D1Database, item: PlaidItemRow): Promise
   }
 
   const accountRows = await db
-    .prepare("SELECT id, plaid_account_id FROM account WHERE plaid_item_id = ?")
+    .prepare("SELECT id, plaid_account_id, asset_class FROM account WHERE plaid_item_id = ?")
     .bind(item.id)
-    .all<{ id: string; plaid_account_id: string }>();
-  const accountIdByPlaidId = new Map(
-    (accountRows.results ?? []).map((row) => [row.plaid_account_id, row.id])
+    .all<{ id: string; plaid_account_id: string; asset_class: string }>();
+  const accountByPlaidId = new Map(
+    (accountRows.results ?? []).map((row) => [row.plaid_account_id, row])
   );
 
   const rulesResult = await db
@@ -89,19 +89,21 @@ export async function syncPlaidItem(db: D1Database, item: PlaidItemRow): Promise
   const rules = rulesResult.results ?? [];
 
   for (const tx of [...added, ...modified]) {
-    const accountId = accountIdByPlaidId.get(tx.account_id);
-    if (!accountId) continue;
+    const account = accountByPlaidId.get(tx.account_id);
+    if (!account) continue;
+    const accountId = account.id;
 
     const ruleMatch = applyCategoryRules(rules, {
       name: tx.name,
       merchant_name: tx.merchant_name ?? null,
     });
-    const categoryId =
-      ruleMatch ??
-      defaultCategoryFor(
-        tx.personal_finance_category?.primary,
-        tx.personal_finance_category?.detailed
-      );
+    const categoryId = isInvestmentAssetClass(account.asset_class)
+      ? "cat_transfer"
+      : ruleMatch ??
+        defaultCategoryFor(
+          tx.personal_finance_category?.primary,
+          tx.personal_finance_category?.detailed
+        );
 
     await db
       .prepare(
