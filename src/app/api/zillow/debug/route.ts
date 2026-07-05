@@ -7,9 +7,9 @@ import { NextResponse } from "next/server";
  * Zillow integration is confirmed working.
  */
 export async function GET(request: Request) {
-  const address =
-    new URL(request.url).searchParams.get("address") ?? "18321 SE 147th Pl, Renton, WA 98059";
-  const host = process.env.ZILLOW_RAPIDAPI_HOST || "zillow-com1.p.rapidapi.com";
+  const params = new URL(request.url).searchParams;
+  const address = params.get("address") ?? "18321 SE 147th Pl, Renton, WA 98059";
+  const host = params.get("host") || process.env.ZILLOW_RAPIDAPI_HOST || "zillow-com1.p.rapidapi.com";
   const key = process.env.ZILLOW_RAPIDAPI_KEY;
 
   if (!key) {
