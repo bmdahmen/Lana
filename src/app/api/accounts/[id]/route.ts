@@ -13,6 +13,7 @@ const updateSchema = z.object({
   isClosed: z.boolean().optional(),
   currentBalance: z.number().optional(),
   metalTroyOz: z.number().positive().optional(),
+  cryptoAmount: z.number().positive().optional(),
   relevantFrom: z.string().nullable().optional(),
   relevantUntil: z.string().nullable().optional(),
   propertyAddress: z.string().min(1).optional(),
@@ -72,6 +73,18 @@ export async function PATCH(
     const prices = await getSpotPrices(db);
     updates.push("metal_troy_oz = ?", "current_balance = ?");
     bindings.push(body.data.metalTroyOz, body.data.metalTroyOz * prices[account.precious_metal]);
+  }
+  if (body.data.cryptoAmount !== undefined) {
+    const account = await db
+      .prepare("SELECT crypto_symbol FROM account WHERE id = ?")
+      .bind(id)
+      .first<{ crypto_symbol: "btc" | "eth" | null }>();
+    if (!account?.crypto_symbol) {
+      return NextResponse.json({ error: "Account is not a crypto account" }, { status: 400 });
+    }
+    const prices = await getSpotPrices(db);
+    updates.push("crypto_amount = ?", "current_balance = ?");
+    bindings.push(body.data.cryptoAmount, body.data.cryptoAmount * prices[account.crypto_symbol]);
   }
   if (body.data.propertyAddress !== undefined) {
     const account = await db

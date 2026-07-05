@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getDB, newId } from "@/lib/db";
 import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 import { recomputeNetWorth } from "@/lib/sync";
-import { isAssetClassLiability, PRECIOUS_METALS } from "@/lib/asset-classes";
+import { isAssetClassLiability, PRECIOUS_METALS, CRYPTOCURRENCIES } from "@/lib/asset-classes";
 import { getSpotPrices } from "@/lib/spot-price";
 import { fetchZestimate } from "@/lib/zillow";
 
@@ -39,12 +39,17 @@ const createSchema = z
     currentBalance: z.number().optional(),
     preciousMetal: z.enum(PRECIOUS_METALS).optional(),
     metalTroyOz: z.number().positive().optional(),
+    cryptoSymbol: z.enum(CRYPTOCURRENCIES).optional(),
+    cryptoAmount: z.number().positive().optional(),
     propertyAddress: z.string().min(1).optional(),
   })
   .refine(
     (data) => {
       if (data.assetClass === "precious_metals") {
         return data.preciousMetal !== undefined && data.metalTroyOz !== undefined;
+      }
+      if (data.assetClass === "crypto") {
+        return data.cryptoSymbol !== undefined && data.cryptoAmount !== undefined;
       }
       if (data.assetClass === "real_estate") {
         return data.propertyAddress !== undefined || data.currentBalance !== undefined;
@@ -70,6 +75,10 @@ export async function POST(request: Request) {
     const prices = await getSpotPrices(db);
     currentBalance = body.data.metalTroyOz * prices[body.data.preciousMetal];
   }
+  if (body.data.assetClass === "crypto" && body.data.cryptoSymbol && body.data.cryptoAmount) {
+    const prices = await getSpotPrices(db);
+    currentBalance = body.data.cryptoAmount * prices[body.data.cryptoSymbol];
+  }
   if (body.data.assetClass === "real_estate" && body.data.propertyAddress) {
     try {
       currentBalance = await fetchZestimate(body.data.propertyAddress);
@@ -83,8 +92,8 @@ export async function POST(request: Request) {
     .prepare(
       `INSERT INTO account (
          id, name, type, current_balance, is_manual, is_asset, asset_class,
-         precious_metal, metal_troy_oz, property_address, zestimate_updated_at
-       ) VALUES (?, ?, 'other', ?, 1, ?, ?, ?, ?, ?, ?)`
+         precious_metal, metal_troy_oz, crypto_symbol, crypto_amount, property_address, zestimate_updated_at
+       ) VALUES (?, ?, 'other', ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       id,
@@ -94,6 +103,8 @@ export async function POST(request: Request) {
       body.data.assetClass,
       body.data.preciousMetal ?? null,
       body.data.metalTroyOz ?? null,
+      body.data.cryptoSymbol ?? null,
+      body.data.cryptoAmount ?? null,
       body.data.propertyAddress ?? null,
       zestimateUpdatedAt
     )

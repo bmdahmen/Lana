@@ -2,7 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ASSET_CLASSES, PRECIOUS_METALS, type PreciousMetal } from "@/lib/asset-classes";
+import {
+  ASSET_CLASSES,
+  PRECIOUS_METALS,
+  CRYPTOCURRENCIES,
+  type PreciousMetal,
+  type Cryptocurrency,
+} from "@/lib/asset-classes";
 import { formatCurrency } from "@/lib/format";
 import type { AddressSuggestion } from "@/lib/zillow";
 
@@ -14,7 +20,11 @@ export function AddManualAccountButton() {
   const [balance, setBalance] = useState("");
   const [preciousMetal, setPreciousMetal] = useState<PreciousMetal>("gold");
   const [troyOz, setTroyOz] = useState("");
-  const [spotPrices, setSpotPrices] = useState<Record<PreciousMetal, number> | null>(null);
+  const [cryptoSymbol, setCryptoSymbol] = useState<Cryptocurrency>("btc");
+  const [cryptoAmount, setCryptoAmount] = useState("");
+  const [spotPrices, setSpotPrices] = useState<Record<PreciousMetal | Cryptocurrency, number> | null>(
+    null
+  );
   const [propertyAddress, setPropertyAddress] = useState("");
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
   const [manualRealEstateValue, setManualRealEstateValue] = useState(false);
@@ -23,15 +33,16 @@ export function AddManualAccountButton() {
   const suppressSuggestRef = useRef(false);
 
   const isPreciousMetal = assetClass === "precious_metals";
+  const isCrypto = assetClass === "crypto";
   const isRealEstate = assetClass === "real_estate";
 
   useEffect(() => {
-    if (!isPreciousMetal || spotPrices) return;
+    if ((!isPreciousMetal && !isCrypto) || spotPrices) return;
     fetch("/api/spot-price")
-      .then((res) => res.json() as Promise<Record<PreciousMetal, number>>)
+      .then((res) => res.json() as Promise<Record<PreciousMetal | Cryptocurrency, number>>)
       .then(setSpotPrices)
       .catch(() => {});
-  }, [isPreciousMetal, spotPrices]);
+  }, [isPreciousMetal, isCrypto, spotPrices]);
 
   useEffect(() => {
     if (!isRealEstate || manualRealEstateValue) return;
@@ -73,7 +84,9 @@ export function AddManualAccountButton() {
     try {
       const body = isPreciousMetal
         ? { name, assetClass, preciousMetal, metalTroyOz: Number(troyOz) }
-        : isRealEstate && !manualRealEstateValue
+        : isCrypto
+          ? { name, assetClass, cryptoSymbol, cryptoAmount: Number(cryptoAmount) }
+          : isRealEstate && !manualRealEstateValue
           ? { name, assetClass, propertyAddress: propertyAddress.replace(/\s*\n+\s*/g, ", ").trim() }
           : { name, assetClass, currentBalance: Number(balance) };
       const res = await fetch("/api/accounts", {
@@ -90,6 +103,7 @@ export function AddManualAccountButton() {
       setName("");
       setBalance("");
       setTroyOz("");
+      setCryptoAmount("");
       setPropertyAddress("");
       setManualRealEstateValue(false);
       router.refresh();
@@ -177,6 +191,46 @@ export function AddManualAccountButton() {
                       <p className="mt-1 text-xs text-zinc-500">
                         ≈ {formatCurrency(Number(troyOz) * spotPrices[preciousMetal])} at{" "}
                         {formatCurrency(spotPrices[preciousMetal])}/oz spot
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : isCrypto ? (
+                <>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      Coin
+                    </label>
+                    <select
+                      value={cryptoSymbol}
+                      onChange={(e) => setCryptoSymbol(e.target.value as Cryptocurrency)}
+                      className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
+                    >
+                      {CRYPTOCURRENCIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c.toUpperCase()}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      Amount
+                    </label>
+                    <input
+                      required
+                      type="number"
+                      step="0.00000001"
+                      min="0"
+                      value={cryptoAmount}
+                      onChange={(e) => setCryptoAmount(e.target.value)}
+                      placeholder="e.g. 0.5"
+                      className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
+                    />
+                    {spotPrices && Number(cryptoAmount) > 0 && (
+                      <p className="mt-1 text-xs text-zinc-500">
+                        ≈ {formatCurrency(Number(cryptoAmount) * spotPrices[cryptoSymbol])} at{" "}
+                        {formatCurrency(spotPrices[cryptoSymbol])}/{cryptoSymbol.toUpperCase()} spot
                       </p>
                     )}
                   </div>

@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { PreciousMetal } from "@/lib/asset-classes";
+import type { PreciousMetal, Cryptocurrency } from "@/lib/asset-classes";
 
 export function AccountRowActions({
   accountId,
   isHidden,
   isManual,
   preciousMetal,
+  cryptoSymbol,
   isHistorical,
   propertyAddress,
 }: {
@@ -16,6 +17,7 @@ export function AccountRowActions({
   isHidden: boolean;
   isManual: boolean;
   preciousMetal?: PreciousMetal | null;
+  cryptoSymbol?: Cryptocurrency | null;
   isHistorical?: boolean;
   propertyAddress?: string | null;
 }) {
@@ -64,6 +66,20 @@ export function AccountRowActions({
           Update ounces
         </button>
       )}
+      {isManual && cryptoSymbol && (
+        <button
+          disabled={submitting}
+          onClick={() => {
+            const value = prompt(`New amount of ${cryptoSymbol.toUpperCase()}`);
+            if (value !== null && !Number.isNaN(Number(value)) && Number(value) > 0) {
+              patch({ cryptoAmount: Number(value) });
+            }
+          }}
+          className="text-zinc-500 hover:text-zinc-900 disabled:opacity-50 dark:hover:text-zinc-50"
+        >
+          Update amount
+        </button>
+      )}
       {isManual && propertyAddress !== undefined && propertyAddress !== null && (
         <button
           disabled={submitting}
@@ -78,7 +94,7 @@ export function AccountRowActions({
           Update address
         </button>
       )}
-      {isManual && !preciousMetal && !propertyAddress && (
+      {isManual && !preciousMetal && !cryptoSymbol && !propertyAddress && (
         <button
           disabled={submitting}
           onClick={() => {

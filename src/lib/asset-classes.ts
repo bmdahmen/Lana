@@ -35,6 +35,9 @@ export const NET_WORTH_DISPLAY_CLASSES = ASSET_CLASSES.filter(
 export const PRECIOUS_METALS = ["gold", "silver"] as const;
 export type PreciousMetal = (typeof PRECIOUS_METALS)[number];
 
+export const CRYPTOCURRENCIES = ["btc", "eth"] as const;
+export type Cryptocurrency = (typeof CRYPTOCURRENCIES)[number];
+
 const RETIREMENT_SUBTYPES = new Set([
   "401k",
   "403b",

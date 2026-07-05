@@ -1,7 +1,7 @@
 import { getPlaidClient } from "@/lib/plaid";
 import { applyCategoryRules, defaultCategoryFor, type CategoryRule } from "@/lib/categorize";
 import { newId } from "@/lib/db";
-import { recomputeMetalAccountBalances } from "@/lib/spot-price";
+import { recomputeSpotPriceAccountBalances } from "@/lib/spot-price";
 import { recomputeRealEstateAccountBalances } from "@/lib/zillow";
 import { refreshNetWorthSeriesCache } from "@/lib/queries";
 
@@ -42,7 +42,7 @@ export async function recomputeAccountBalances(
 ): Promise<void> {
   if (!options?.force && !(await isRecomputeStale(db))) return;
 
-  await Promise.all([recomputeMetalAccountBalances(db), recomputeRealEstateAccountBalances(db)]);
+  await Promise.all([recomputeSpotPriceAccountBalances(db), recomputeRealEstateAccountBalances(db)]);
   await recomputeNetWorth(db, { force: true });
 }
 

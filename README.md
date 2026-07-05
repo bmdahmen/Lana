@@ -100,6 +100,19 @@ load, so no separate cron job is needed. Use "Update ounces" on the Accounts
 page to change the quantity later; the dollar value recalculates from the
 latest cached spot price.
 
+## Crypto (BTC, ETH)
+
+The "Add manual account" flow also special-cases the **Crypto** category:
+instead of entering a dollar balance, you enter a coin quantity and pick BTC
+or ETH. The balance is computed as `amount * spot_price` and kept current
+automatically — `src/lib/spot-price.ts` fetches USD spot prices from the
+free, unauthenticated [CoinGecko](https://www.coingecko.com) simple price API,
+caches them in the same `spot_price` table used for precious metals, and
+refreshes at most once an hour. The dashboard and Accounts page both trigger
+a refresh check on load, so no separate cron job is needed. Use "Update
+amount" on the Accounts page to change the quantity later; the dollar value
+recalculates from the latest cached spot price.
+
 ## Real estate (Zillow Zestimate)
 
 The "Add manual account" flow also special-cases the **Real Estate** category:

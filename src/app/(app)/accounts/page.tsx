@@ -1,7 +1,7 @@
 import { getDB } from "@/lib/db";
 import { getCached, CACHE_KEYS } from "@/lib/cache";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { type AssetClass, type PreciousMetal } from "@/lib/asset-classes";
+import { type AssetClass, type PreciousMetal, type Cryptocurrency } from "@/lib/asset-classes";
 import { recomputeAccountBalances } from "@/lib/sync";
 import { AddManualAccountButton } from "@/components/add-manual-account-button";
 import { AccountRowActions } from "@/components/account-row-actions";
@@ -23,6 +23,8 @@ interface AccountRow {
   item_status: string | null;
   precious_metal: PreciousMetal | null;
   metal_troy_oz: number | null;
+  crypto_symbol: Cryptocurrency | null;
+  crypto_amount: number | null;
   relevant_from: string | null;
   relevant_until: string | null;
   property_address: string | null;
@@ -36,8 +38,8 @@ export default async function AccountsPage() {
       .prepare(
         `SELECT a.id, a.name, a.official_name, a.mask, a.current_balance, a.is_manual, a.is_hidden,
                 a.asset_class, p.institution_name, p.status as item_status,
-                a.precious_metal, a.metal_troy_oz, a.relevant_from, a.relevant_until,
-                a.property_address
+                a.precious_metal, a.metal_troy_oz, a.crypto_symbol, a.crypto_amount,
+                a.relevant_from, a.relevant_until, a.property_address
          FROM account a
          LEFT JOIN plaid_item p ON p.id = a.plaid_item_id
          WHERE a.is_closed = 0
@@ -88,6 +90,11 @@ export default async function AccountsPage() {
                         {acc.metal_troy_oz} troy oz {acc.precious_metal}
                       </p>
                     )}
+                    {acc.crypto_symbol && (
+                      <p className="mt-1 text-xs text-zinc-500">
+                        {acc.crypto_amount} {acc.crypto_symbol.toUpperCase()}
+                      </p>
+                    )}
                     {acc.relevant_until && (
                       <p className="mt-0.5 inline-flex items-center rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500 dark:bg-zinc-900">
                         Historical: {acc.relevant_from ? formatDate(acc.relevant_from) : "—"}
@@ -117,6 +124,7 @@ export default async function AccountsPage() {
                     isHidden={!!acc.is_hidden}
                     isManual={!!acc.is_manual}
                     preciousMetal={acc.precious_metal}
+                    cryptoSymbol={acc.crypto_symbol}
                     isHistorical={!!acc.relevant_until}
                     propertyAddress={acc.property_address}
                   />
@@ -146,6 +154,11 @@ export default async function AccountsPage() {
                       {acc.precious_metal && (
                         <p className="text-xs text-zinc-500">
                           {acc.metal_troy_oz} troy oz {acc.precious_metal}
+                        </p>
+                      )}
+                      {acc.crypto_symbol && (
+                        <p className="text-xs text-zinc-500">
+                          {acc.crypto_amount} {acc.crypto_symbol.toUpperCase()}
                         </p>
                       )}
                       {acc.relevant_until && (
@@ -179,6 +192,7 @@ export default async function AccountsPage() {
                         isHidden={!!acc.is_hidden}
                         isManual={!!acc.is_manual}
                         preciousMetal={acc.precious_metal}
+                        cryptoSymbol={acc.crypto_symbol}
                         isHistorical={!!acc.relevant_until}
                         propertyAddress={acc.property_address}
                       />
