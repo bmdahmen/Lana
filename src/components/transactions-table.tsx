@@ -2,6 +2,9 @@
 
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { getCachedFetch, setCachedFetch, invalidateCachedFetch } from "@/lib/client-cache";
+
+const DEFAULT_TRANSACTIONS_CACHE_KEY = "transactions:default";
 
 interface Category {
   id: string;
@@ -40,6 +43,17 @@ export function TransactionsTable({ categories }: { categories: Category[] }) {
   const [ruleMessage, setRuleMessage] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    const isDefaultView = !search && !categoryFilter;
+
+    if (isDefaultView) {
+      const cached = getCachedFetch<Transaction[]>(DEFAULT_TRANSACTIONS_CACHE_KEY);
+      if (cached) {
+        setTransactions(cached);
+        setLoading(false);
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -47,7 +61,11 @@ export function TransactionsTable({ categories }: { categories: Category[] }) {
       if (categoryFilter) params.set("categoryId", categoryFilter);
       const res = await fetch(`/api/transactions?${params.toString()}`);
       const data = (await res.json()) as { transactions?: Transaction[] };
-      setTransactions(data.transactions ?? []);
+      const transactions = data.transactions ?? [];
+      setTransactions(transactions);
+      if (isDefaultView) {
+        setCachedFetch(DEFAULT_TRANSACTIONS_CACHE_KEY, transactions);
+      }
     } finally {
       setLoading(false);
     }
@@ -62,6 +80,7 @@ export function TransactionsTable({ categories }: { categories: Category[] }) {
     setTransactions((prev) =>
       prev.map((t) => (t.id === id ? { ...t, category_id: categoryId } : t))
     );
+    invalidateCachedFetch(DEFAULT_TRANSACTIONS_CACHE_KEY);
     await fetch(`/api/transactions/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -102,6 +121,7 @@ export function TransactionsTable({ categories }: { categories: Category[] }) {
           applyData.updated === 1 ? "" : "s"
         }.`
       );
+      invalidateCachedFetch(DEFAULT_TRANSACTIONS_CACHE_KEY);
       await load();
     } finally {
       setRuleSubmitting(false);
