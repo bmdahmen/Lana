@@ -1,7 +1,7 @@
 const ZESTIMATE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 function getZillowHost(): string {
-  return process.env.ZILLOW_RAPIDAPI_HOST || "zillow-com1.p.rapidapi.com";
+  return process.env.ZILLOW_RAPIDAPI_HOST || "zillow-real-estate-api.p.rapidapi.com";
 }
 
 function getZillowApiKey(): string {
@@ -10,74 +10,49 @@ function getZillowApiKey(): string {
   return key;
 }
 
-function zillowHeaders(host: string): Record<string, string> {
-  return {
-    "x-rapidapi-key": getZillowApiKey(),
-    "x-rapidapi-host": host,
-  };
-}
-
 const RATE_LIMIT_RETRY_DELAYS_MS = [500, 1500];
 
 /** RapidAPI free/basic tiers commonly cap requests per second; retry a 429 a couple times before giving up. */
 async function zillowFetch(url: string, host: string): Promise<Response> {
   let res: Response;
   for (let attempt = 0; ; attempt++) {
-    res = await fetch(url, { headers: zillowHeaders(host) });
+    res = await fetch(url, {
+      headers: { "x-rapidapi-key": getZillowApiKey(), "x-rapidapi-host": host },
+    });
     if (res.status !== 429 || attempt >= RATE_LIMIT_RETRY_DELAYS_MS.length) return res;
     await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_RETRY_DELAYS_MS[attempt]));
   }
 }
 
-function describeStatus(status: number): string {
-  return status === 429 ? "rate limited by the Zillow API — wait a moment and try again" : `HTTP ${status}`;
+interface PropertyLookupData {
+  zpid: number;
+  address?: { full?: string };
+  financials?: { zestimate?: number };
 }
 
-function extractZestimate(data: unknown): number | null {
-  if (typeof data !== "object" || data === null) return null;
-  const record = data as Record<string, unknown>;
-  const candidates = [
-    record.zestimate,
-    (record.property as Record<string, unknown> | undefined)?.zestimate,
-    (record.data as Record<string, unknown> | undefined)?.zestimate,
-  ];
-  for (const candidate of candidates) {
-    if (typeof candidate === "number") return candidate;
-  }
-  return null;
+interface PropertyLookupResponse {
+  success: boolean;
+  data?: PropertyLookupData;
+  error?: { code: string; message: string };
 }
 
-async function searchProperties(rawQuery: string): Promise<Array<Record<string, unknown>>> {
-  const query = rawQuery.replace(/\s*\n+\s*/g, ", ").trim();
+/** Resolves a free-text address to full property details, including the Zestimate, in one call. */
+async function lookupProperty(rawAddress: string): Promise<PropertyLookupData> {
+  const address = rawAddress.replace(/\s*\n+\s*/g, ", ").trim();
   const host = getZillowHost();
   const res = await zillowFetch(
-    `https://${host}/propertyExtendedSearch?location=${encodeURIComponent(query)}`,
+    `https://${host}/v1/property/lookup?address=${encodeURIComponent(address)}`,
     host
   );
-  if (!res.ok) {
-    throw new Error(`Zillow address search failed for "${query}": ${describeStatus(res.status)}`);
-  }
-  const data = (await res.json()) as { props?: Array<Record<string, unknown>> };
-  return data.props ?? [];
-}
+  const json = (await res.json().catch(() => null)) as PropertyLookupResponse | null;
 
-/** Resolves a free-text address to a Zillow Property ID via the search endpoint. */
-async function findZpid(address: string): Promise<string> {
-  const props = await searchProperties(address);
-  const zpid = props[0]?.zpid;
-  if (zpid == null) {
-    throw new Error(`No property found for "${address}"`);
+  if (!res.ok || !json?.success || !json.data) {
+    const detail =
+      json?.error?.message ?? (res.status === 429 ? "rate limited by the Zillow API" : `HTTP ${res.status}`);
+    throw new Error(`Zillow lookup failed for "${address}": ${detail}`);
   }
-  return String(zpid);
-}
 
-function formatPropAddress(prop: Record<string, unknown>): string | null {
-  if (typeof prop.address === "string") return prop.address;
-  const { streetAddress, city, state, zipcode } = prop;
-  if (typeof streetAddress === "string" && typeof city === "string" && typeof state === "string") {
-    return `${streetAddress}, ${city}, ${state}${typeof zipcode === "string" ? ` ${zipcode}` : ""}`;
-  }
-  return null;
+  return json.data;
 }
 
 export interface AddressSuggestion {
@@ -85,41 +60,24 @@ export interface AddressSuggestion {
   zpid: string;
 }
 
-/** Live address suggestions for a partial query, for an autocomplete dropdown. */
+/** A live suggestion for a partial/typo'd address, for an autocomplete dropdown. */
 export async function suggestAddresses(query: string): Promise<AddressSuggestion[]> {
-  let props: Array<Record<string, unknown>>;
   try {
-    props = await searchProperties(query);
+    const data = await lookupProperty(query);
+    if (!data.address?.full) return [];
+    return [{ address: data.address.full, zpid: String(data.zpid) }];
   } catch {
     return [];
   }
-  const results: AddressSuggestion[] = [];
-  for (const prop of props) {
-    const address = formatPropAddress(prop);
-    if (address && prop.zpid != null) {
-      results.push({ address, zpid: String(prop.zpid) });
-      if (results.length >= 5) break;
-    }
-  }
-  return results;
 }
 
 /** Looks up a live Zestimate for an address via a RapidAPI Zillow data provider. */
 export async function fetchZestimate(address: string): Promise<number> {
-  const zpid = await findZpid(address);
-  await new Promise((resolve) => setTimeout(resolve, 350));
-  const host = getZillowHost();
-  const res = await zillowFetch(`https://${host}/property?zpid=${zpid}`, host);
-  if (!res.ok) {
-    throw new Error(
-      `Zillow property lookup failed for "${address}" (zpid ${zpid}): ${describeStatus(res.status)}`
-    );
-  }
-  const zestimate = extractZestimate(await res.json());
-  if (zestimate == null) {
+  const data = await lookupProperty(address);
+  if (typeof data.financials?.zestimate !== "number") {
     throw new Error(`No Zestimate found for "${address}"`);
   }
-  return zestimate;
+  return data.financials.zestimate;
 }
 
 /** Refreshes any real-estate account's cached Zestimate once it's more than a day old. */
