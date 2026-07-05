@@ -43,5 +43,9 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // PWA/home-screen assets (icons, manifest) are fetched unauthenticated by
+  // the OS/browser, same reasoning as the favicon.ico exclusion below.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|apple-icon.png|icon.svg|icon-192.png|icon-512.png|manifest.webmanifest).*)",
+  ],
 };
