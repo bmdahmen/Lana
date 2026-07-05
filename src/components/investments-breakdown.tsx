@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatCurrency } from "@/lib/format";
-import { TransactionsTable } from "@/components/transactions-table";
+import { InvestmentTransactionsList } from "@/components/investment-transactions-list";
 import { buildMonthOptions } from "@/lib/month-range";
 import { ASSET_CLASSES } from "@/lib/asset-classes";
+import type { InvestmentBreakdownRow } from "@/lib/investment-transactions";
 
 const MONTHS_BACK = 12;
 
 type InvestmentAssetClass = "brokerage" | "retirement" | "crypto";
+type BreakdownRow = InvestmentBreakdownRow;
 
 const INVESTMENT_CLASS_IDS: InvestmentAssetClass[] = ["brokerage", "retirement", "crypto"];
 const ASSET_CLASS_FILTERS = ASSET_CLASSES.filter(
@@ -16,16 +18,7 @@ const ASSET_CLASS_FILTERS = ASSET_CLASSES.filter(
     INVESTMENT_CLASS_IDS.includes(c.id as InvestmentAssetClass)
 );
 
-interface BreakdownRow {
-  account_id: string;
-  account_name: string;
-  asset_class: InvestmentAssetClass;
-  contributions: number;
-  distributions: number;
-  count: number;
-}
-
-function classIcon(assetClass: InvestmentAssetClass): string {
+function classIcon(assetClass: string): string {
   return ASSET_CLASS_FILTERS.find((c) => c.id === assetClass)?.icon ?? "💰";
 }
 
@@ -203,17 +196,13 @@ export function InvestmentsBreakdown({ initialBreakdown }: { initialBreakdown: B
             </button>
           )}
         </div>
-        <TransactionsTable
+        <InvestmentTransactionsList
           key={`${from}:${to}:${assetClassFilter ?? "all"}`}
-          categories={[]}
           fixedAccountId={activeAccount?.account_id}
           assetClasses={listAssetClasses}
           from={from}
           to={to}
           defaultSort="amount"
-          collapsibleSearch
-          hideCategoryDropdown
-          hideCategoryColumn
         />
       </div>
     </div>

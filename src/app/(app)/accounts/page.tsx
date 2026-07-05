@@ -7,6 +7,9 @@ import { AccountRowActions } from "@/components/account-row-actions";
 import { AccountCategorySelect } from "@/components/account-category-select";
 import { LinkAccountButton } from "@/components/link-account-button";
 import { ImportCsvButton } from "@/components/import-csv-button";
+import { EnableInvestmentsButton } from "@/components/enable-investments-button";
+
+const INVESTMENT_CLASSES = new Set(["brokerage", "retirement", "crypto"]);
 
 interface AccountRow {
   id: string;
@@ -26,6 +29,11 @@ interface AccountRow {
   relevant_from: string | null;
   relevant_until: string | null;
   property_address: string | null;
+  has_investment_activity: number;
+}
+
+function needsInvestmentsAccess(acc: AccountRow): boolean {
+  return !acc.is_manual && INVESTMENT_CLASSES.has(acc.asset_class) && !acc.has_investment_activity;
 }
 
 interface AccountGroup {
@@ -60,7 +68,8 @@ export default async function AccountsPage() {
         `SELECT a.id, a.name, a.official_name, a.mask, a.current_balance, a.is_manual, a.is_hidden,
                 a.asset_class, p.institution_name, p.status as item_status,
                 a.precious_metal, a.metal_troy_oz, a.crypto_symbol, a.crypto_amount,
-                a.relevant_from, a.relevant_until, a.property_address
+                a.relevant_from, a.relevant_until, a.property_address,
+                EXISTS(SELECT 1 FROM investment_transaction it WHERE it.account_id = a.id) as has_investment_activity
          FROM account a
          LEFT JOIN plaid_item p ON p.id = a.plaid_item_id
          WHERE a.is_closed = 0
@@ -136,6 +145,11 @@ export default async function AccountsPage() {
                         propertyAddress={acc.property_address}
                       />
                     </div>
+                    {needsInvestmentsAccess(acc) && (
+                      <div className="mt-1.5 border-t border-zinc-100 pt-1.5 dark:border-zinc-900">
+                        <EnableInvestmentsButton accountId={acc.id} />
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -152,6 +166,11 @@ export default async function AccountsPage() {
                             {acc.mask && <span className="text-zinc-400"> •••• {acc.mask}</span>}
                           </p>
                           <p className="text-xs text-zinc-400 dark:text-zinc-600">{accountSubline(acc)}</p>
+                          {needsInvestmentsAccess(acc) && (
+                            <div className="mt-1">
+                              <EnableInvestmentsButton accountId={acc.id} />
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-2.5">
                           <AccountCategorySelect accountId={acc.id} assetClass={acc.asset_class} />

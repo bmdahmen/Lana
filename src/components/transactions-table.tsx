@@ -37,23 +37,16 @@ interface RuleDraft {
 export function TransactionsTable({
   categories,
   fixedCategoryId,
-  fixedAccountId,
-  assetClasses,
   from,
   to,
   defaultSort = "recent",
   collapsibleSearch = false,
   hideCategoryDropdown = false,
-  hideCategoryColumn = false,
 }: {
   categories: Category[];
   /** When set, results are locked to this category. Reactive: changing it (e.g. from a
    *  clickable category tile above this table) re-filters the list. */
   fixedCategoryId?: string;
-  /** When set, results are locked to this account. Reactive, like fixedCategoryId. */
-  fixedAccountId?: string;
-  /** Restricts results to accounts in these asset classes (e.g. investment accounts only). */
-  assetClasses?: string[];
   /** Optional fixed date range (inclusive), e.g. when embedded for a single month. */
   from?: string;
   to?: string;
@@ -63,8 +56,6 @@ export function TransactionsTable({
   collapsibleSearch?: boolean;
   /** Hide the built-in category dropdown, e.g. when category filtering is driven externally. */
   hideCategoryDropdown?: boolean;
-  /** Hide the per-row category select + rule action, e.g. when every row is a transfer. */
-  hideCategoryColumn?: boolean;
 }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [search, setSearch] = useState("");
@@ -74,10 +65,6 @@ export function TransactionsTable({
   // directly (reactively, so a parent's category-tile click re-filters).
   const [categoryFilterState, setCategoryFilterState] = useState("");
   const categoryFilter = fixedCategoryId !== undefined ? fixedCategoryId : categoryFilterState;
-  const accountFilter = fixedAccountId ?? "";
-  // Joined to a stable string key -- callers often pass a fresh array literal
-  // each render, which would otherwise retrigger the fetch every render.
-  const assetClassKey = assetClasses?.join(",") ?? "";
   const [sortMode, setSortMode] = useState<"recent" | "amount">(defaultSort);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -93,8 +80,6 @@ export function TransactionsTable({
       const params = new URLSearchParams();
       if (search) params.set("search", search);
       if (categoryFilter) params.set("categoryId", categoryFilter);
-      if (accountFilter) params.set("accountId", accountFilter);
-      if (assetClassKey) params.set("assetClass", assetClassKey);
       if (from) params.set("from", from);
       if (to) params.set("to", to);
       if (sortMode !== "recent") params.set("sort", sortMode);
@@ -102,12 +87,11 @@ export function TransactionsTable({
       params.set("offset", String(offset));
       return params;
     },
-    [search, categoryFilter, accountFilter, assetClassKey, from, to, sortMode]
+    [search, categoryFilter, from, to, sortMode]
   );
 
   const load = useCallback(async () => {
-    const isDefaultView =
-      !search && !categoryFilter && !accountFilter && !assetClassKey && !from && !to && sortMode === "recent";
+    const isDefaultView = !search && !categoryFilter && !from && !to && sortMode === "recent";
 
     if (isDefaultView) {
       const cached = getCachedFetch<Transaction[]>(DEFAULT_TRANSACTIONS_CACHE_KEY);
@@ -132,7 +116,7 @@ export function TransactionsTable({
     } finally {
       setLoading(false);
     }
-  }, [search, categoryFilter, accountFilter, assetClassKey, from, to, sortMode, buildParams]);
+  }, [search, categoryFilter, from, to, sortMode, buildParams]);
 
   useEffect(() => {
     const timeout = setTimeout(load, 250);
@@ -371,11 +355,9 @@ export function TransactionsTable({
               >
                 <div className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto">
                   <div className="flex w-full shrink-0 snap-start items-start gap-2.5 px-3 py-2.5">
-                    {!hideCategoryColumn && (
-                      <span className="mt-0.5 shrink-0 text-lg leading-none" aria-hidden>
-                        {tx.category_icon ?? "❔"}
-                      </span>
-                    )}
+                    <span className="mt-0.5 shrink-0 text-lg leading-none" aria-hidden>
+                      {tx.category_icon ?? "❔"}
+                    </span>
                     <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
@@ -399,38 +381,36 @@ export function TransactionsTable({
                       </span>
                     </div>
                   </div>
-                  {!hideCategoryColumn && (
-                    <div className="flex shrink-0 snap-end items-center gap-1 border-l border-zinc-100 px-3 dark:border-zinc-900">
-                      <button
-                        type="button"
-                        aria-label="Edit category"
-                        onClick={() => {
+                  <div className="flex shrink-0 snap-end items-center gap-1 border-l border-zinc-100 px-3 dark:border-zinc-900">
+                    <button
+                      type="button"
+                      aria-label="Edit category"
+                      onClick={() => {
+                        setRuleDraft(null);
+                        setCategoryEditId(categoryEditId === tx.id ? null : tx.id);
+                      }}
+                      className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"
+                    >
+                      <TagIcon />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Create rule"
+                      onClick={() => {
+                        setCategoryEditId(null);
+                        if (ruleDraft?.txId === tx.id) {
                           setRuleDraft(null);
-                          setCategoryEditId(categoryEditId === tx.id ? null : tx.id);
-                        }}
-                        className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"
-                      >
-                        <TagIcon />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label="Create rule"
-                        onClick={() => {
-                          setCategoryEditId(null);
-                          if (ruleDraft?.txId === tx.id) {
-                            setRuleDraft(null);
-                          } else {
-                            openRuleForm(tx);
-                          }
-                        }}
-                        className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"
-                      >
-                        <PlusIcon />
-                      </button>
-                    </div>
-                  )}
+                        } else {
+                          openRuleForm(tx);
+                        }
+                      }}
+                      className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"
+                    >
+                      <PlusIcon />
+                    </button>
+                  </div>
                 </div>
-                {!hideCategoryColumn && categoryEditId === tx.id && (
+                {categoryEditId === tx.id && (
                   <div className="border-t border-zinc-100 px-3 py-2 dark:border-zinc-900">
                     <select
                       autoFocus
@@ -449,7 +429,7 @@ export function TransactionsTable({
                     </select>
                   </div>
                 )}
-                {!hideCategoryColumn && ruleDraft?.txId === tx.id && (
+                {ruleDraft?.txId === tx.id && (
                   <div className="border-t border-zinc-100 px-3 py-2 dark:border-zinc-900">
                     <RuleDraftForm />
                   </div>
@@ -466,7 +446,7 @@ export function TransactionsTable({
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Description</th>
                   <th className="px-4 py-3">Account</th>
-                  {!hideCategoryColumn && <th className="px-4 py-3">Category</th>}
+                  <th className="px-4 py-3">Category</th>
                   <th className="px-4 py-3 text-right">Amount</th>
                 </tr>
               </thead>
@@ -490,37 +470,35 @@ export function TransactionsTable({
                       <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                         {tx.account_name}
                       </td>
-                      {!hideCategoryColumn && (
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <select
-                              value={tx.category_id ?? ""}
-                              onChange={(e) => updateCategory(tx.id, e.target.value)}
-                              className="rounded-md border border-zinc-300 bg-transparent px-2 py-1 text-xs outline-none dark:border-zinc-700"
-                            >
-                              {categories.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                  {c.icon} {c.name}
-                                </option>
-                              ))}
-                            </select>
-                            <button
-                              onClick={() =>
-                                ruleDraft?.txId === tx.id ? setRuleDraft(null) : openRuleForm(tx)
-                              }
-                              className="whitespace-nowrap text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
-                            >
-                              + rule
-                            </button>
-                          </div>
-                        </td>
-                      )}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={tx.category_id ?? ""}
+                            onChange={(e) => updateCategory(tx.id, e.target.value)}
+                            className="rounded-md border border-zinc-300 bg-transparent px-2 py-1 text-xs outline-none dark:border-zinc-700"
+                          >
+                            {categories.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.icon} {c.name}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() =>
+                              ruleDraft?.txId === tx.id ? setRuleDraft(null) : openRuleForm(tx)
+                            }
+                            className="whitespace-nowrap text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                          >
+                            + rule
+                          </button>
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-right font-medium text-zinc-900 dark:text-zinc-50">
                         {tx.amount > 0 ? "-" : "+"}
                         {formatCurrency(Math.abs(tx.amount))}
                       </td>
                     </tr>
-                    {!hideCategoryColumn && ruleDraft?.txId === tx.id && (
+                    {ruleDraft?.txId === tx.id && (
                       <tr>
                         <td colSpan={5} className="bg-zinc-50 px-4 py-3 dark:bg-zinc-900">
                           <RuleDraftForm />

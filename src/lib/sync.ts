@@ -77,6 +77,136 @@ function accountIsAsset(type: string): boolean {
   return type !== "credit" && type !== "loan";
 }
 
+/**
+ * Pulls buy/sell/cash activity for an item's investment-type accounts via
+ * Plaid's Investments product (`/investments/transactions/get`) -- separate
+ * from, and never returned by, the regular Transactions product that
+ * `syncPlaidItem` otherwise relies on. Requires the item to have granted
+ * Investments consent (see EnableInvestmentsButton's update-mode Link flow);
+ * until then, or while Plaid's async historical extraction is still running
+ * right after that consent is granted, this call fails with PRODUCT_NOT_READY
+ * and is skipped quietly -- there's nothing to do but retry on the next sync.
+ */
+const INVESTMENT_TRANSACTIONS_LOOKBACK_DAYS = 730;
+const INVESTMENT_TRANSACTIONS_PAGE_SIZE = 500;
+const BATCH_SIZE = 50;
+
+export async function syncInvestmentTransactions(db: D1Database, item: PlaidItemRow): Promise<void> {
+  const investmentAccounts = await db
+    .prepare("SELECT id, plaid_account_id FROM account WHERE plaid_item_id = ? AND type = 'investment'")
+    .bind(item.id)
+    .all<{ id: string; plaid_account_id: string }>();
+  const accountByPlaidId = new Map(
+    (investmentAccounts.results ?? []).map((row) => [row.plaid_account_id, row.id])
+  );
+  if (accountByPlaidId.size === 0) return;
+
+  const plaid = getPlaidClient();
+  const today = new Date().toISOString().slice(0, 10);
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - INVESTMENT_TRANSACTIONS_LOOKBACK_DAYS);
+  const start = startDate.toISOString().slice(0, 10);
+
+  const securityNames = new Map<string, string>();
+  const rows: Array<{
+    plaidId: string;
+    accountId: string;
+    securityId: string | null;
+    date: string;
+    name: string;
+    amount: number;
+    quantity: number | null;
+    price: number | null;
+    fees: number | null;
+    type: string;
+    subtype: string;
+    isoCurrencyCode: string | null;
+  }> = [];
+
+  let offset = 0;
+  let total = Infinity;
+  try {
+    while (offset < total) {
+      const response = await plaid.investmentsTransactionsGet({
+        access_token: item.access_token,
+        start_date: start,
+        end_date: today,
+        options: { count: INVESTMENT_TRANSACTIONS_PAGE_SIZE, offset },
+      });
+
+      for (const security of response.data.securities) {
+        if (security.name) securityNames.set(security.security_id, security.name);
+      }
+      for (const tx of response.data.investment_transactions) {
+        const accountId = accountByPlaidId.get(tx.account_id);
+        if (!accountId) continue;
+        rows.push({
+          plaidId: tx.investment_transaction_id,
+          accountId,
+          securityId: tx.security_id,
+          date: tx.date,
+          name: tx.name,
+          amount: tx.amount,
+          quantity: tx.quantity ?? null,
+          price: tx.price ?? null,
+          fees: tx.fees ?? null,
+          type: tx.type,
+          subtype: tx.subtype,
+          isoCurrencyCode: tx.iso_currency_code,
+        });
+      }
+
+      total = response.data.total_investment_transactions;
+      const pageLength = response.data.investment_transactions.length;
+      if (pageLength === 0) break;
+      offset += pageLength;
+    }
+  } catch {
+    return;
+  }
+
+  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+    const chunk = rows.slice(i, i + BATCH_SIZE);
+    await db.batch(
+      chunk.map((row) =>
+        db
+          .prepare(
+            `INSERT INTO investment_transaction (
+               id, plaid_investment_transaction_id, account_id, security_name, date, name,
+               amount, quantity, price, fees, type, subtype, iso_currency_code
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(plaid_investment_transaction_id) DO UPDATE SET
+               security_name = excluded.security_name,
+               date = excluded.date,
+               name = excluded.name,
+               amount = excluded.amount,
+               quantity = excluded.quantity,
+               price = excluded.price,
+               fees = excluded.fees,
+               type = excluded.type,
+               subtype = excluded.subtype,
+               updated_at = datetime('now')`
+          )
+          .bind(
+            newId("itx"),
+            row.plaidId,
+            row.accountId,
+            row.securityId ? securityNames.get(row.securityId) ?? null : null,
+            row.date,
+            row.name,
+            row.amount,
+            row.quantity,
+            row.price,
+            row.fees,
+            row.type,
+            row.subtype,
+            row.isoCurrencyCode ?? "USD"
+          )
+      )
+    );
+  }
+}
+
 export async function syncPlaidItem(db: D1Database, item: PlaidItemRow): Promise<void> {
   const plaid = getPlaidClient();
 
@@ -189,6 +319,7 @@ export async function syncPlaidItem(db: D1Database, item: PlaidItemRow): Promise
       .run();
   }
 
+  await syncInvestmentTransactions(db, item);
   await recomputeNetWorth(db, { force: true });
 }
 

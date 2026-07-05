@@ -7,7 +7,6 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const accountId = searchParams.get("accountId");
   const categoryId = searchParams.get("categoryId");
-  const assetClass = searchParams.get("assetClass");
   const search = searchParams.get("search");
   const from = searchParams.get("from");
   const to = searchParams.get("to");
@@ -25,13 +24,6 @@ export async function GET(request: Request) {
   if (categoryId) {
     conditions.push("t.category_id = ?");
     bindings.push(categoryId);
-  }
-  if (assetClass) {
-    const classes = assetClass.split(",").filter(Boolean);
-    if (classes.length > 0) {
-      conditions.push(`a.asset_class IN (${classes.map(() => "?").join(", ")})`);
-      bindings.push(...classes);
-    }
   }
   if (search) {
     conditions.push("(t.name LIKE ? OR t.merchant_name LIKE ?)");
@@ -72,7 +64,7 @@ export async function GET(request: Request) {
   // Only the plain, unfiltered first page (default sort) is worth caching --
   // it's what every tab switch to Transactions loads, whereas filtered/paged/
   // sorted queries are each hit once and would just bloat the cache.
-  const hasUserFilter = Boolean(accountId || categoryId || assetClass || search || from || to);
+  const hasUserFilter = Boolean(accountId || categoryId || search || from || to);
   const isDefaultQuery = !hasUserFilter && sort === "recent" && limit === 100 && offset === 0;
   const transactions = isDefaultQuery
     ? await getCached(CACHE_KEYS.transactionsDefault, runQuery)
