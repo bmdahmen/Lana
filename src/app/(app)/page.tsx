@@ -82,17 +82,6 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col">
-      <header className="flex items-center justify-between px-4 pt-6 pb-2 sm:px-8 md:hidden">
-        <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Lana</span>
-        <Link
-          href="/accounts"
-          aria-label="Add account"
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 text-zinc-500 dark:border-zinc-800 dark:text-zinc-400"
-        >
-          +
-        </Link>
-      </header>
-
       <NetWorthDashboard
         initialPoints={byClassPoints}
         initialDays={HERO_DEFAULT_DAYS}

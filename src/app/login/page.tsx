@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
+import { Logo } from "@/components/logo";
 
 declare global {
   interface Window {
@@ -84,7 +85,7 @@ export default function LoginPage() {
       <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
       <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 dark:bg-black">
         <div className="w-full max-w-sm rounded-xl border border-zinc-200 bg-white p-8 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-          <h1 className="mb-1 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Lana</h1>
+          <Logo className="mb-3 justify-center" iconSize={40} />
           <p className="mb-6 text-sm text-zinc-500">Sign in to your finances.</p>
           {GOOGLE_CLIENT_ID ? (
             <div className="flex justify-center" ref={buttonRef} />
