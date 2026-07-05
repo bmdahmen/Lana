@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatCurrency } from "@/lib/format";
 import { TransactionsTable } from "@/components/transactions-table";
+import { buildMonthOptions } from "@/lib/month-range";
 
 const MONTHS_BACK = 12;
 
@@ -18,30 +19,6 @@ interface Category {
   id: string;
   name: string;
   icon: string | null;
-}
-
-interface MonthOption {
-  from: string;
-  to: string;
-  label: string;
-}
-
-function toISODate(year: number, month: number, day: number): string {
-  return new Date(year, month, day).toISOString().slice(0, 10);
-}
-
-function buildMonthOptions(count: number): MonthOption[] {
-  const now = new Date();
-  return Array.from({ length: count }, (_, i) => {
-    const year = now.getFullYear();
-    const month = now.getMonth() - i;
-    const start = new Date(year, month, 1);
-    return {
-      from: toISODate(start.getFullYear(), start.getMonth(), 1),
-      to: toISODate(start.getFullYear(), start.getMonth() + 1, 0),
-      label: start.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
-    };
-  });
 }
 
 export function SpendingBreakdown({

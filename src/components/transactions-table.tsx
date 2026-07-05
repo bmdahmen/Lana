@@ -37,16 +37,23 @@ interface RuleDraft {
 export function TransactionsTable({
   categories,
   fixedCategoryId,
+  fixedAccountId,
+  assetClasses,
   from,
   to,
   defaultSort = "recent",
   collapsibleSearch = false,
   hideCategoryDropdown = false,
+  hideCategoryColumn = false,
 }: {
   categories: Category[];
   /** When set, results are locked to this category. Reactive: changing it (e.g. from a
    *  clickable category tile above this table) re-filters the list. */
   fixedCategoryId?: string;
+  /** When set, results are locked to this account. Reactive, like fixedCategoryId. */
+  fixedAccountId?: string;
+  /** Restricts results to accounts in these asset classes (e.g. investment accounts only). */
+  assetClasses?: string[];
   /** Optional fixed date range (inclusive), e.g. when embedded for a single month. */
   from?: string;
   to?: string;
@@ -56,6 +63,8 @@ export function TransactionsTable({
   collapsibleSearch?: boolean;
   /** Hide the built-in category dropdown, e.g. when category filtering is driven externally. */
   hideCategoryDropdown?: boolean;
+  /** Hide the per-row category select + rule action, e.g. when every row is a transfer. */
+  hideCategoryColumn?: boolean;
 }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [search, setSearch] = useState("");
@@ -65,6 +74,10 @@ export function TransactionsTable({
   // directly (reactively, so a parent's category-tile click re-filters).
   const [categoryFilterState, setCategoryFilterState] = useState("");
   const categoryFilter = fixedCategoryId !== undefined ? fixedCategoryId : categoryFilterState;
+  const accountFilter = fixedAccountId ?? "";
+  // Joined to a stable string key -- callers often pass a fresh array literal
+  // each render, which would otherwise retrigger the fetch every render.
+  const assetClassKey = assetClasses?.join(",") ?? "";
   const [sortMode, setSortMode] = useState<"recent" | "amount">(defaultSort);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -78,6 +91,8 @@ export function TransactionsTable({
       const params = new URLSearchParams();
       if (search) params.set("search", search);
       if (categoryFilter) params.set("categoryId", categoryFilter);
+      if (accountFilter) params.set("accountId", accountFilter);
+      if (assetClassKey) params.set("assetClass", assetClassKey);
       if (from) params.set("from", from);
       if (to) params.set("to", to);
       if (sortMode !== "recent") params.set("sort", sortMode);
@@ -85,11 +100,12 @@ export function TransactionsTable({
       params.set("offset", String(offset));
       return params;
     },
-    [search, categoryFilter, from, to, sortMode]
+    [search, categoryFilter, accountFilter, assetClassKey, from, to, sortMode]
   );
 
   const load = useCallback(async () => {
-    const isDefaultView = !search && !categoryFilter && !from && !to && sortMode === "recent";
+    const isDefaultView =
+      !search && !categoryFilter && !accountFilter && !assetClassKey && !from && !to && sortMode === "recent";
 
     if (isDefaultView) {
       const cached = getCachedFetch<Transaction[]>(DEFAULT_TRANSACTIONS_CACHE_KEY);
@@ -114,7 +130,7 @@ export function TransactionsTable({
     } finally {
       setLoading(false);
     }
-  }, [search, categoryFilter, from, to, sortMode, buildParams]);
+  }, [search, categoryFilter, accountFilter, assetClassKey, from, to, sortMode, buildParams]);
 
   useEffect(() => {
     const timeout = setTimeout(load, 250);
@@ -366,28 +382,30 @@ export function TransactionsTable({
                     {formatCurrency(Math.abs(tx.amount))}
                   </span>
                 </div>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <select
-                    value={tx.category_id ?? ""}
-                    onChange={(e) => updateCategory(tx.id, e.target.value)}
-                    className="w-full rounded-md border border-zinc-300 bg-transparent px-2 py-1 text-xs outline-none dark:border-zinc-700"
-                  >
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.icon} {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() =>
-                      ruleDraft?.txId === tx.id ? setRuleDraft(null) : openRuleForm(tx)
-                    }
-                    className="shrink-0 whitespace-nowrap text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
-                  >
-                    + rule
-                  </button>
-                </div>
-                {ruleDraft?.txId === tx.id && (
+                {!hideCategoryColumn && (
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <select
+                      value={tx.category_id ?? ""}
+                      onChange={(e) => updateCategory(tx.id, e.target.value)}
+                      className="w-full rounded-md border border-zinc-300 bg-transparent px-2 py-1 text-xs outline-none dark:border-zinc-700"
+                    >
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.icon} {c.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() =>
+                        ruleDraft?.txId === tx.id ? setRuleDraft(null) : openRuleForm(tx)
+                      }
+                      className="shrink-0 whitespace-nowrap text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                    >
+                      + rule
+                    </button>
+                  </div>
+                )}
+                {!hideCategoryColumn && ruleDraft?.txId === tx.id && (
                   <div className="mt-2">
                     <RuleDraftForm />
                   </div>
@@ -404,7 +422,7 @@ export function TransactionsTable({
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Description</th>
                   <th className="px-4 py-3">Account</th>
-                  <th className="px-4 py-3">Category</th>
+                  {!hideCategoryColumn && <th className="px-4 py-3">Category</th>}
                   <th className="px-4 py-3 text-right">Amount</th>
                 </tr>
               </thead>
@@ -428,35 +446,37 @@ export function TransactionsTable({
                       <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                         {tx.account_name}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={tx.category_id ?? ""}
-                            onChange={(e) => updateCategory(tx.id, e.target.value)}
-                            className="rounded-md border border-zinc-300 bg-transparent px-2 py-1 text-xs outline-none dark:border-zinc-700"
-                          >
-                            {categories.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.icon} {c.name}
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            onClick={() =>
-                              ruleDraft?.txId === tx.id ? setRuleDraft(null) : openRuleForm(tx)
-                            }
-                            className="whitespace-nowrap text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
-                          >
-                            + rule
-                          </button>
-                        </div>
-                      </td>
+                      {!hideCategoryColumn && (
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={tx.category_id ?? ""}
+                              onChange={(e) => updateCategory(tx.id, e.target.value)}
+                              className="rounded-md border border-zinc-300 bg-transparent px-2 py-1 text-xs outline-none dark:border-zinc-700"
+                            >
+                              {categories.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.icon} {c.name}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() =>
+                                ruleDraft?.txId === tx.id ? setRuleDraft(null) : openRuleForm(tx)
+                              }
+                              className="whitespace-nowrap text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                            >
+                              + rule
+                            </button>
+                          </div>
+                        </td>
+                      )}
                       <td className="px-4 py-3 text-right font-medium text-zinc-900 dark:text-zinc-50">
                         {tx.amount > 0 ? "-" : "+"}
                         {formatCurrency(Math.abs(tx.amount))}
                       </td>
                     </tr>
-                    {ruleDraft?.txId === tx.id && (
+                    {!hideCategoryColumn && ruleDraft?.txId === tx.id && (
                       <tr>
                         <td colSpan={5} className="bg-zinc-50 px-4 py-3 dark:bg-zinc-900">
                           <RuleDraftForm />
