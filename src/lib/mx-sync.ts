@@ -2,7 +2,7 @@ import { listMemberAccounts, listMemberTransactions } from "@/lib/mx";
 import {
   applyCategoryRules,
   defaultCategoryFromLabel,
-  isBrokerageAssetClass,
+  isInvestmentAssetClass,
   type CategoryRule,
 } from "@/lib/categorize";
 import { newId } from "@/lib/db";
@@ -58,7 +58,7 @@ export async function syncMxMember(
       name: tx.description,
       merchant_name: null,
     });
-    const categoryId = isBrokerageAssetClass(account.asset_class)
+    const categoryId = isInvestmentAssetClass(account.asset_class)
       ? "cat_transfer"
       : ruleMatch ?? defaultCategoryFromLabel(tx.category);
 

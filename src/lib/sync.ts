@@ -1,5 +1,5 @@
 import { getPlaidClient } from "@/lib/plaid";
-import { applyCategoryRules, defaultCategoryFor, isBrokerageAssetClass, type CategoryRule } from "@/lib/categorize";
+import { applyCategoryRules, defaultCategoryFor, isInvestmentAssetClass, type CategoryRule } from "@/lib/categorize";
 import { newId } from "@/lib/db";
 import { recomputeSpotPriceAccountBalances } from "@/lib/spot-price";
 import { recomputeRealEstateAccountBalances } from "@/lib/zillow";
@@ -95,7 +95,7 @@ export async function syncPlaidItem(db: D1Database, item: PlaidItemRow): Promise
       name: tx.name,
       merchant_name: tx.merchant_name ?? null,
     });
-    const categoryId = isBrokerageAssetClass(account.asset_class)
+    const categoryId = isInvestmentAssetClass(account.asset_class)
       ? "cat_transfer"
       : ruleMatch ??
         defaultCategoryFor(

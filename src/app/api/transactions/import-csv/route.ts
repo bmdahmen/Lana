@@ -5,7 +5,7 @@ import { parseTransactionsFromCsv } from "@/lib/csv-import";
 import {
   applyCategoryRules,
   defaultCategoryFromLabel,
-  isBrokerageAssetClass,
+  isInvestmentAssetClass,
   type CategoryRule,
 } from "@/lib/categorize";
 import { recomputeNetWorth } from "@/lib/sync";
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     const importHash = `${accountId}|${tx.date}|${tx.description}|${tx.amount}`;
 
     const ruleMatch = applyCategoryRules(rules, { name: tx.description, merchant_name: null });
-    const categoryId = isBrokerageAssetClass(account.asset_class)
+    const categoryId = isInvestmentAssetClass(account.asset_class)
       ? "cat_transfer"
       : ruleMatch ?? defaultCategoryFromLabel(tx.category);
 
