@@ -16,6 +16,6 @@ export async function POST(request: Request) {
 
   const db = await getDB();
   await recomputeAccountBalances(db, { force: true });
-  await invalidateCache(CACHE_KEYS.homeDashboard);
+  await invalidateCache(CACHE_KEYS.homeDashboard, CACHE_KEYS.transactionsDefault, CACHE_KEYS.accountsList);
   return NextResponse.json({ ok: true });
 }

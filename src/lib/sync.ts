@@ -31,8 +31,32 @@ async function markRecomputed(db: D1Database): Promise<void> {
 }
 
 /**
- * Refreshes metal, real-estate, and net-worth balances together, at most
- * once per throttle window. Called from the nightly cron
+ * Re-syncs every connected Plaid item's transactions. Plaid continues to
+ * backfill an Item's historical transactions asynchronously for a while
+ * after it's first linked, delivering the older data as further "added"
+ * entries on subsequent `/transactions/sync` calls -- but until now nothing
+ * ever called this again outside of Plaid's own SYNC_UPDATES_AVAILABLE
+ * webhook, so an item that finished backfilling more history than its
+ * initial sync returned would never actually have it pulled in.
+ */
+export async function syncAllPlaidItems(db: D1Database): Promise<void> {
+  const items = await db
+    .prepare("SELECT id, access_token, cursor FROM plaid_item WHERE status = 'good'")
+    .all<PlaidItemRow>();
+
+  for (const item of items.results ?? []) {
+    try {
+      await syncPlaidItem(db, item);
+    } catch {
+      // Best-effort: one item's sync failure (e.g. a transient Plaid error)
+      // shouldn't block the others or the balance recompute that follows.
+    }
+  }
+}
+
+/**
+ * Refreshes Plaid transactions, metal, real-estate, and net-worth balances
+ * together, at most once per throttle window. Called from the nightly cron
  * (api/cron/snapshot) and the manual-refresh API route
  * (api/net-worth/recompute), so the throttle guards against back-to-back
  * invocations re-running this whole pipeline (including sequential writes)
@@ -44,6 +68,7 @@ export async function recomputeAccountBalances(
 ): Promise<void> {
   if (!options?.force && !(await isRecomputeStale(db))) return;
 
+  await syncAllPlaidItems(db);
   await Promise.all([recomputeSpotPriceAccountBalances(db), recomputeRealEstateAccountBalances(db)]);
   await recomputeNetWorth(db, { force: true });
 }
