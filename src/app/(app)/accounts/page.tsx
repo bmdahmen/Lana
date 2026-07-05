@@ -39,7 +39,7 @@ export default async function AccountsPage() {
        FROM account a
        LEFT JOIN plaid_item p ON p.id = a.plaid_item_id
        WHERE a.is_closed = 0
-       ORDER BY a.is_hidden ASC, a.asset_class ASC, a.name ASC`
+       ORDER BY (a.relevant_until IS NOT NULL) ASC, a.is_hidden ASC, a.asset_class ASC, a.current_balance DESC`
     )
     .all<AccountRow>();
   const accounts = result.results ?? [];

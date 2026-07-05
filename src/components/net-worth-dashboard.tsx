@@ -49,10 +49,12 @@ export function NetWorthDashboard({
   const rangeLabel = HOME_RANGES.find((r) => r.days === days)?.label ?? "";
 
   const classBreakdown = displayPoint
-    ? NET_WORTH_DISPLAY_CLASSES.filter((cls) => Number(displayPoint[cls.id] ?? 0) !== 0).map((cls) => ({
-        ...cls,
-        value: Number(displayPoint[cls.id] ?? 0),
-      }))
+    ? NET_WORTH_DISPLAY_CLASSES.filter((cls) => Number(displayPoint[cls.id] ?? 0) !== 0)
+        .map((cls) => ({
+          ...cls,
+          value: Number(displayPoint[cls.id] ?? 0),
+        }))
+        .sort((a, b) => b.value - a.value)
     : [];
 
   return (
