@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { getDB, newId } from "@/lib/db";
 import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 import { parseTransactionsFromCsv } from "@/lib/csv-import";
-import { applyCategoryRules, defaultCategoryFromLabel, type CategoryRule } from "@/lib/categorize";
+import {
+  applyCategoryRules,
+  defaultCategoryFromLabel,
+  isBrokerageAssetClass,
+  type CategoryRule,
+} from "@/lib/categorize";
 import { recomputeNetWorth } from "@/lib/sync";
 
 export async function POST(request: Request) {
@@ -17,9 +22,9 @@ export async function POST(request: Request) {
 
   const db = await getDB();
   const account = await db
-    .prepare("SELECT id FROM account WHERE id = ?")
+    .prepare("SELECT id, asset_class FROM account WHERE id = ?")
     .bind(accountId)
-    .first<{ id: string }>();
+    .first<{ id: string; asset_class: string }>();
   if (!account) {
     return NextResponse.json({ error: "Account not found" }, { status: 404 });
   }
@@ -47,7 +52,9 @@ export async function POST(request: Request) {
     const importHash = `${accountId}|${tx.date}|${tx.description}|${tx.amount}`;
 
     const ruleMatch = applyCategoryRules(rules, { name: tx.description, merchant_name: null });
-    const categoryId = ruleMatch ?? defaultCategoryFromLabel(tx.category);
+    const categoryId = isBrokerageAssetClass(account.asset_class)
+      ? "cat_transfer"
+      : ruleMatch ?? defaultCategoryFromLabel(tx.category);
 
     const result = await db
       .prepare(
