@@ -238,7 +238,7 @@ export async function syncPlaidItem(db: D1Database, item: PlaidItemRow): Promise
 
   const rulesResult = await db
     .prepare(
-      "SELECT match_field, match_type, match_value, category_id FROM category_rule ORDER BY priority DESC"
+      "SELECT match_field, match_type, match_value, description_value, category_id FROM category_rule ORDER BY priority DESC"
     )
     .all<CategoryRule>();
   const rules = rulesResult.results ?? [];

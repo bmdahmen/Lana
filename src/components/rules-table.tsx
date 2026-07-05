@@ -14,6 +14,7 @@ interface Rule {
   match_field: "merchant_name" | "name" | "both";
   match_type: "contains" | "equals";
   match_value: string;
+  description_value: string | null;
   category_id: string;
   category_name: string;
   category_icon: string | null;
@@ -23,6 +24,13 @@ interface Rule {
 function matchFieldLabel(field: Rule["match_field"]): string {
   if (field === "both") return "merchant name & description";
   return field === "merchant_name" ? "merchant name" : "description";
+}
+
+function ruleValueSummary(rule: Rule): string {
+  if (rule.match_field === "both") {
+    return `merchant "${rule.match_value}" & description "${rule.description_value}"`;
+  }
+  return rule.match_value;
 }
 
 export function RulesTable({
@@ -40,19 +48,30 @@ export function RulesTable({
   const [matchField, setMatchField] = useState<Rule["match_field"]>("both");
   const [matchType, setMatchType] = useState<Rule["match_type"]>("contains");
   const [matchValue, setMatchValue] = useState("");
+  const [descriptionValue, setDescriptionValue] = useState("");
   const [categoryId, setCategoryId] = useState(categories[0]?.id ?? "");
+
+  const isBoth = matchField === "both";
 
   async function createRule(e: React.FormEvent) {
     e.preventDefault();
     if (!matchValue.trim() || !categoryId) return;
+    if (isBoth && !descriptionValue.trim()) return;
     setSubmitting(true);
     try {
       await fetch("/api/rules", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ matchField, matchType, matchValue: matchValue.trim(), categoryId }),
+        body: JSON.stringify({
+          matchField,
+          matchType,
+          matchValue: matchValue.trim(),
+          descriptionValue: isBoth ? descriptionValue.trim() : undefined,
+          categoryId,
+        }),
       });
       setMatchValue("");
+      setDescriptionValue("");
       router.refresh();
     } finally {
       setSubmitting(false);
@@ -111,14 +130,27 @@ export function RulesTable({
           </select>
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-zinc-500">Value</label>
+          <label className="text-xs font-medium text-zinc-500">
+            {isBoth ? "Merchant value" : "Value"}
+          </label>
           <input
             value={matchValue}
             onChange={(e) => setMatchValue(e.target.value)}
-            placeholder="e.g. CHASE CREDIT CRD PAYMENT"
+            placeholder={isBoth ? "e.g. Chase" : "e.g. CHASE CREDIT CRD PAYMENT"}
             className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 sm:w-64 dark:border-zinc-700 dark:bg-zinc-900"
           />
         </div>
+        {isBoth && (
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-zinc-500">Description value</label>
+            <input
+              value={descriptionValue}
+              onChange={(e) => setDescriptionValue(e.target.value)}
+              placeholder="e.g. CREDIT CRD PAYMENT"
+              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 sm:w-64 dark:border-zinc-700 dark:bg-zinc-900"
+            />
+          </div>
+        )}
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-zinc-500">Then categorize as</label>
           <select
@@ -158,7 +190,7 @@ export function RulesTable({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-medium text-zinc-900 dark:text-zinc-50">
-                      {rule.match_value}
+                      {ruleValueSummary(rule)}
                     </p>
                     <p className="mt-0.5 text-xs text-zinc-500">
                       {matchFieldLabel(rule.match_field)} {rule.match_type} → {rule.category_icon}{" "}
@@ -194,7 +226,7 @@ export function RulesTable({
                       {matchFieldLabel(rule.match_field)} {rule.match_type}
                     </td>
                     <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-50">
-                      {rule.match_value}
+                      {ruleValueSummary(rule)}
                     </td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                       {rule.category_icon} {rule.category_name}

@@ -12,6 +12,7 @@ interface Rule {
   match_field: "merchant_name" | "name" | "both";
   match_type: "contains" | "equals";
   match_value: string;
+  description_value: string | null;
   category_id: string;
   category_name: string;
   category_icon: string | null;

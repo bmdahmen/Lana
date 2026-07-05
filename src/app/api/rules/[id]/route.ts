@@ -6,6 +6,7 @@ const updateSchema = z.object({
   matchField: z.enum(["merchant_name", "name", "both"]).optional(),
   matchType: z.enum(["contains", "equals"]).optional(),
   matchValue: z.string().min(1).optional(),
+  descriptionValue: z.string().min(1).nullable().optional(),
   categoryId: z.string().min(1).optional(),
   priority: z.number().int().optional(),
 });
@@ -24,6 +25,7 @@ export async function PATCH(
     match_field: body.data.matchField,
     match_type: body.data.matchType,
     match_value: body.data.matchValue,
+    description_value: body.data.descriptionValue,
     category_id: body.data.categoryId,
     priority: body.data.priority,
   };

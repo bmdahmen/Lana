@@ -77,7 +77,11 @@ export function defaultCategoryFromLabel(label: string | null | undefined): stri
 export interface CategoryRule {
   match_field: "merchant_name" | "name" | "both";
   match_type: "contains" | "equals";
+  // Merchant-name value for "merchant_name" or "both"; the sole value for "name".
   match_value: string;
+  // Only used (and required) when match_field is "both" -- the value checked
+  // against the raw description, independent of match_value's merchant text.
+  description_value?: string | null;
   category_id: string;
 }
 
@@ -92,16 +96,19 @@ export function applyCategoryRules(
   transaction: { name: string; merchant_name: string | null }
 ): string | null {
   for (const rule of rules) {
-    const needle = rule.match_value.toLowerCase();
-    const matched =
-      rule.match_field === "both"
-        ? fieldMatches(transaction.merchant_name, rule.match_type, needle) &&
-          fieldMatches(transaction.name, rule.match_type, needle)
-        : fieldMatches(
-            rule.match_field === "merchant_name" ? transaction.merchant_name : transaction.name,
-            rule.match_type,
-            needle
-          );
+    let matched: boolean;
+    if (rule.match_field === "both") {
+      if (!rule.description_value) continue;
+      matched =
+        fieldMatches(transaction.merchant_name, rule.match_type, rule.match_value.toLowerCase()) &&
+        fieldMatches(transaction.name, rule.match_type, rule.description_value.toLowerCase());
+    } else {
+      matched = fieldMatches(
+        rule.match_field === "merchant_name" ? transaction.merchant_name : transaction.name,
+        rule.match_type,
+        rule.match_value.toLowerCase()
+      );
+    }
     if (matched) return rule.category_id;
   }
   return null;

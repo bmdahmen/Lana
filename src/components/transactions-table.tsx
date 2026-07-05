@@ -31,6 +31,8 @@ interface RuleDraft {
   matchField: "merchant_name" | "name" | "both";
   matchType: "contains" | "equals";
   matchValue: string;
+  /** Description value, only used (and required) when matchField is "both". */
+  descriptionValue: string;
   categoryId: string;
 }
 
@@ -156,8 +158,11 @@ export function TransactionsTable({
       // match against -- more precise than either field alone, since a raw
       // description often contains extra noise (location, a trailing
       // reference number) that a plain "name"-only rule would need to avoid.
+      // Merchant name and description are usually different strings, so each
+      // gets its own value rather than checking one value against both.
       matchField: tx.merchant_name ? "both" : "name",
       matchValue: tx.merchant_name ?? tx.name,
+      descriptionValue: tx.name,
       matchType: "contains",
       categoryId: tx.category_id ?? categories[0]?.id ?? "",
     });
@@ -165,6 +170,7 @@ export function TransactionsTable({
 
   async function submitRule() {
     if (!ruleDraft || !ruleDraft.matchValue.trim() || !ruleDraft.categoryId) return;
+    if (ruleDraft.matchField === "both" && !ruleDraft.descriptionValue.trim()) return;
     setRuleSubmitting(true);
     try {
       await fetch("/api/rules", {
@@ -174,6 +180,8 @@ export function TransactionsTable({
           matchField: ruleDraft.matchField,
           matchType: ruleDraft.matchType,
           matchValue: ruleDraft.matchValue.trim(),
+          descriptionValue:
+            ruleDraft.matchField === "both" ? ruleDraft.descriptionValue.trim() : undefined,
           categoryId: ruleDraft.categoryId,
         }),
       });
@@ -231,13 +239,25 @@ export function TransactionsTable({
             </select>
           </div>
           <div className="flex flex-1 flex-col gap-1">
-            <label className="text-xs font-medium text-zinc-500">Value</label>
+            <label className="text-xs font-medium text-zinc-500">
+              {ruleDraft.matchField === "both" ? "Merchant value" : "Value"}
+            </label>
             <input
               value={ruleDraft.matchValue}
               onChange={(e) => setRuleDraft({ ...ruleDraft, matchValue: e.target.value })}
               className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 sm:w-64 dark:border-zinc-700 dark:bg-zinc-900"
             />
           </div>
+          {ruleDraft.matchField === "both" && (
+            <div className="flex flex-1 flex-col gap-1">
+              <label className="text-xs font-medium text-zinc-500">Description value</label>
+              <input
+                value={ruleDraft.descriptionValue}
+                onChange={(e) => setRuleDraft({ ...ruleDraft, descriptionValue: e.target.value })}
+                className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 sm:w-64 dark:border-zinc-700 dark:bg-zinc-900"
+              />
+            </div>
+          )}
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-zinc-500">Always categorize as</label>
             <select
