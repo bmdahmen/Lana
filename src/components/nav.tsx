@@ -8,7 +8,6 @@ import { LogoutButton } from "@/components/logout-button";
 
 const TABS: { href: string; label: string; icon: (active: boolean) => ReactNode }[] = [
   { href: "/", label: "Home", icon: HomeIcon },
-  { href: "/transactions", label: "Activity", icon: ActivityIcon },
   { href: "/spending", label: "Spending", icon: SpendingIcon },
   { href: "/accounts", label: "Accounts", icon: AccountsIcon },
   { href: "/more", label: "More", icon: MoreIcon },
@@ -18,7 +17,6 @@ const SIDE_LINKS = [
   { href: "/", label: "Home" },
   { href: "/net-worth", label: "Net Worth" },
   { href: "/accounts", label: "Accounts" },
-  { href: "/transactions", label: "Transactions" },
   { href: "/spending", label: "Spending" },
   { href: "/rules", label: "Rules" },
 ];
@@ -95,14 +93,6 @@ function HomeIcon(active: boolean) {
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.25 : 1.75} strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 11.5 12 4l9 7.5" />
       <path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9" />
-    </svg>
-  );
-}
-
-function ActivityIcon(active: boolean) {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.25 : 1.75} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 12h3l2.5-7 4 14 2.5-9H21" />
     </svg>
   );
 }

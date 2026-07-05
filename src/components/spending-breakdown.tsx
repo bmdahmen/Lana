@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatCurrency } from "@/lib/format";
-import { CategoryTransactionsModal } from "@/components/category-transactions-modal";
+import { TransactionsTable } from "@/components/transactions-table";
 
 const MONTHS_BACK = 12;
 
@@ -59,6 +59,13 @@ export function SpendingBreakdown({
   const [activeCategory, setActiveCategory] = useState<BreakdownRow | null>(null);
   const requestIdRef = useRef(0);
 
+  function selectMonth(index: number) {
+    setSelectedMonth(index);
+    // A category filter from a different month's breakdown wouldn't
+    // necessarily still apply, so clear it on every month switch.
+    setActiveCategory(null);
+  }
+
   const load = useCallback(async () => {
     const requestId = ++requestIdRef.current;
     setLoading(true);
@@ -89,7 +96,7 @@ export function SpendingBreakdown({
           <button
             key={m.from}
             type="button"
-            onClick={() => setSelectedMonth(i)}
+            onClick={() => selectMonth(i)}
             className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
               i === selectedMonth
                 ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900"
@@ -113,52 +120,72 @@ export function SpendingBreakdown({
           <p className="py-8 text-center text-sm text-zinc-500">No spending in this period.</p>
         ) : (
           <ul className="flex flex-col gap-4">
-            {breakdown.map((row) => (
-              <li key={row.category_id}>
-                <button
-                  type="button"
-                  onClick={() => setActiveCategory(row)}
-                  className="group w-full rounded-md text-left"
-                >
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="font-medium text-zinc-900 group-hover:underline dark:text-zinc-50">
-                      {row.category_icon} {row.category_name}
-                    </span>
-                    <span className="text-zinc-600 group-hover:underline dark:text-zinc-400">
-                      {formatCurrency(row.total)}
-                    </span>
-                  </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-900">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${(row.total / max) * 100}%`,
-                        backgroundColor: "var(--chart-net-worth)",
-                      }}
-                    />
-                  </div>
-                </button>
-              </li>
-            ))}
+            {breakdown.map((row) => {
+              const isActive = activeCategory?.category_id === row.category_id;
+              return (
+                <li key={row.category_id}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveCategory(isActive ? null : row)}
+                    aria-pressed={isActive}
+                    className="group w-full rounded-md text-left"
+                  >
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <span className="font-medium text-zinc-900 group-hover:underline dark:text-zinc-50">
+                        {row.category_icon} {row.category_name}
+                      </span>
+                      <span className="text-zinc-600 group-hover:underline dark:text-zinc-400">
+                        {formatCurrency(row.total)}
+                      </span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-900">
+                      <div
+                        className="h-full rounded-full transition-opacity"
+                        style={{
+                          width: `${(row.total / max) * 100}%`,
+                          backgroundColor: "var(--chart-net-worth)",
+                          opacity: activeCategory && !isActive ? 0.35 : 1,
+                        }}
+                      />
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
 
-      {activeCategory && (
-        <CategoryTransactionsModal
-          categoryId={activeCategory.category_id}
-          categoryName={activeCategory.category_name}
-          categoryIcon={activeCategory.category_icon}
-          monthLabel={label}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium text-zinc-500">
+            {activeCategory
+              ? `${activeCategory.category_icon} ${activeCategory.category_name} transactions`
+              : "All transactions"}
+            {" · "}
+            {label}
+          </h2>
+          {activeCategory && (
+            <button
+              type="button"
+              onClick={() => setActiveCategory(null)}
+              className="text-xs font-medium text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+            >
+              Clear filter
+            </button>
+          )}
+        </div>
+        <TransactionsTable
+          key={`${from}:${to}`}
+          categories={categories}
+          fixedCategoryId={activeCategory?.category_id}
           from={from}
           to={to}
-          categories={categories}
-          onClose={() => {
-            setActiveCategory(null);
-            load();
-          }}
+          defaultSort="amount"
+          collapsibleSearch
+          hideCategoryDropdown
         />
-      )}
+      </div>
     </div>
   );
 }

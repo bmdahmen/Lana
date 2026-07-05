@@ -12,6 +12,7 @@ export async function GET(request: Request) {
   const to = searchParams.get("to");
   const limit = Math.min(Number(searchParams.get("limit") ?? 100), 500);
   const offset = Number(searchParams.get("offset") ?? 0);
+  const sort = searchParams.get("sort") === "amount" ? "amount" : "recent";
 
   const conditions: string[] = ["a.is_closed = 0", "a.is_hidden = 0"];
   const bindings: unknown[] = [];
@@ -38,6 +39,10 @@ export async function GET(request: Request) {
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const orderBy =
+    sort === "amount"
+      ? "ORDER BY ABS(t.amount) DESC, t.date DESC"
+      : "ORDER BY t.date DESC, t.created_at DESC";
 
   const db = await getDB();
   const runQuery = async () => {
@@ -48,7 +53,7 @@ export async function GET(request: Request) {
          JOIN account a ON a.id = t.account_id
          LEFT JOIN category c ON c.id = t.category_id
          ${where}
-         ORDER BY t.date DESC, t.created_at DESC
+         ${orderBy}
          LIMIT ? OFFSET ?`
       )
       .bind(...bindings, limit, offset)
@@ -56,11 +61,11 @@ export async function GET(request: Request) {
     return result.results ?? [];
   };
 
-  // Only the plain, unfiltered first page is worth caching -- it's what every
-  // tab switch to Transactions loads, whereas filtered/paged queries are each
-  // hit once and would just bloat the cache.
+  // Only the plain, unfiltered first page (default sort) is worth caching --
+  // it's what every tab switch to Transactions loads, whereas filtered/paged/
+  // sorted queries are each hit once and would just bloat the cache.
   const hasUserFilter = Boolean(accountId || categoryId || search || from || to);
-  const isDefaultQuery = !hasUserFilter && limit === 100 && offset === 0;
+  const isDefaultQuery = !hasUserFilter && sort === "recent" && limit === 100 && offset === 0;
   const transactions = isDefaultQuery
     ? await getCached(CACHE_KEYS.transactionsDefault, runQuery)
     : await runQuery();

@@ -39,17 +39,33 @@ export function TransactionsTable({
   fixedCategoryId,
   from,
   to,
+  defaultSort = "recent",
+  collapsibleSearch = false,
+  hideCategoryDropdown = false,
 }: {
   categories: Category[];
-  /** When set, results are locked to this category and the category filter dropdown is hidden. */
+  /** When set, results are locked to this category. Reactive: changing it (e.g. from a
+   *  clickable category tile above this table) re-filters the list. */
   fixedCategoryId?: string;
   /** Optional fixed date range (inclusive), e.g. when embedded for a single month. */
   from?: string;
   to?: string;
+  /** Initial sort order; user can still toggle via the Recent/Amount control. */
+  defaultSort?: "recent" | "amount";
+  /** Hide the search input behind a small icon toggle instead of always showing it. */
+  collapsibleSearch?: boolean;
+  /** Hide the built-in category dropdown, e.g. when category filtering is driven externally. */
+  hideCategoryDropdown?: boolean;
 }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState(fixedCategoryId ?? "");
+  const [searchOpen, setSearchOpen] = useState(!collapsibleSearch);
+  // Uncontrolled fallback for the built-in dropdown; ignored whenever
+  // fixedCategoryId is provided, in which case that prop drives filtering
+  // directly (reactively, so a parent's category-tile click re-filters).
+  const [categoryFilterState, setCategoryFilterState] = useState("");
+  const categoryFilter = fixedCategoryId !== undefined ? fixedCategoryId : categoryFilterState;
+  const [sortMode, setSortMode] = useState<"recent" | "amount">(defaultSort);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
@@ -64,15 +80,16 @@ export function TransactionsTable({
       if (categoryFilter) params.set("categoryId", categoryFilter);
       if (from) params.set("from", from);
       if (to) params.set("to", to);
+      if (sortMode !== "recent") params.set("sort", sortMode);
       params.set("limit", String(PAGE_SIZE));
       params.set("offset", String(offset));
       return params;
     },
-    [search, categoryFilter, from, to]
+    [search, categoryFilter, from, to, sortMode]
   );
 
   const load = useCallback(async () => {
-    const isDefaultView = !search && !categoryFilter && !from && !to;
+    const isDefaultView = !search && !categoryFilter && !from && !to && sortMode === "recent";
 
     if (isDefaultView) {
       const cached = getCachedFetch<Transaction[]>(DEFAULT_TRANSACTIONS_CACHE_KEY);
@@ -97,7 +114,7 @@ export function TransactionsTable({
     } finally {
       setLoading(false);
     }
-  }, [search, categoryFilter, from, to, buildParams]);
+  }, [search, categoryFilter, from, to, sortMode, buildParams]);
 
   useEffect(() => {
     const timeout = setTimeout(load, 250);
@@ -252,17 +269,35 @@ export function TransactionsTable({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search transactions..."
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 sm:w-64 dark:border-zinc-700 dark:bg-zinc-900"
-        />
-        {!fixedCategoryId && (
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex items-center gap-2">
+          {collapsibleSearch && !searchOpen ? (
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Search transactions"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-zinc-300 text-zinc-500 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+            >
+              <SearchIcon />
+            </button>
+          ) : (
+            <input
+              autoFocus={collapsibleSearch}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onBlur={() => {
+                if (collapsibleSearch && !search) setSearchOpen(false);
+              }}
+              placeholder="Search transactions..."
+              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 sm:w-64 dark:border-zinc-700 dark:bg-zinc-900"
+            />
+          )}
+        </div>
+
+        {!fixedCategoryId && !hideCategoryDropdown && (
           <select
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
+            onChange={(e) => setCategoryFilterState(e.target.value)}
             className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 sm:w-auto dark:border-zinc-700 dark:bg-zinc-900"
           >
             <option value="">All categories</option>
@@ -273,6 +308,23 @@ export function TransactionsTable({
             ))}
           </select>
         )}
+
+        <div className="flex gap-1 sm:ml-auto">
+          {(["amount", "recent"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setSortMode(mode)}
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                sortMode === mode
+                  ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900"
+                  : "border border-zinc-300 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900"
+              }`}
+            >
+              {mode === "amount" ? "Amount" : "Recent"}
+            </button>
+          ))}
+        </div>
       </div>
 
       {ruleMessage && <p className="text-sm text-zinc-500">{ruleMessage}</p>}
@@ -429,5 +481,14 @@ export function TransactionsTable({
         </button>
       )}
     </div>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
   );
 }
