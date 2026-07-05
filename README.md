@@ -105,20 +105,20 @@ latest cached spot price.
 The "Add manual account" flow also special-cases the **Real Estate** category:
 instead of entering a dollar balance, you enter a property address. The
 balance is set from Zillow's Zestimate for that address and kept current
-automatically — `src/lib/zillow.ts` resolves the address to a Zillow property
-ID via the `propertyExtendedSearch` endpoint, then fetches its Zestimate from
-`/property?zpid=...`, through a RapidAPI Zillow data provider
-(`zillow-com1.p.rapidapi.com` by default). The result is cached on the
-account row and refreshed at most once a day. The dashboard and Accounts page
-both trigger a refresh check on load, so no separate cron job is needed.
+automatically — `src/lib/zillow.ts` resolves the address to full property
+details (including the Zestimate) in one call to a RapidAPI Zillow data
+provider's `/v1/property/lookup?address=...` endpoint
+(`zillow-real-estate-api.p.rapidapi.com` by default). The result is cached on
+the account row and refreshed at most once a day. The dashboard and Accounts
+page both trigger a refresh check on load, so no separate cron job is needed.
 
 Set these to enable it:
 
 - `ZILLOW_RAPIDAPI_KEY` — your RapidAPI key, required.
-- `ZILLOW_RAPIDAPI_HOST` — optional, defaults to `zillow-com1.p.rapidapi.com`.
+- `ZILLOW_RAPIDAPI_HOST` — optional, defaults to `zillow-real-estate-api.p.rapidapi.com`.
   Override this if you're using a different Zillow data provider on RapidAPI;
-  you may also need to adjust the response parsing in `src/lib/zillow.ts` if
-  that provider nests the `zestimate` field differently.
+  you'll likely also need to adjust the request/response handling in
+  `src/lib/zillow.ts` since providers vary a lot in endpoint shape.
 
 Use "Update address" on the Accounts page to correct the address or force a
 fresh lookup later.
