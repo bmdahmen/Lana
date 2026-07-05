@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getDB } from "@/lib/db";
 
 const updateSchema = z.object({
-  matchField: z.enum(["merchant_name", "name"]).optional(),
+  matchField: z.enum(["merchant_name", "name", "both"]).optional(),
   matchType: z.enum(["contains", "equals"]).optional(),
   matchValue: z.string().min(1).optional(),
   categoryId: z.string().min(1).optional(),

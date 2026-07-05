@@ -16,7 +16,7 @@ export async function GET() {
 }
 
 const createSchema = z.object({
-  matchField: z.enum(["merchant_name", "name"]),
+  matchField: z.enum(["merchant_name", "name", "both"]),
   matchType: z.enum(["contains", "equals"]),
   matchValue: z.string().min(1),
   categoryId: z.string().min(1),

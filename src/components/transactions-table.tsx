@@ -28,7 +28,7 @@ interface Transaction {
 
 interface RuleDraft {
   txId: string;
-  matchField: "merchant_name" | "name";
+  matchField: "merchant_name" | "name" | "both";
   matchType: "contains" | "equals";
   matchValue: string;
   categoryId: string;
@@ -168,7 +168,11 @@ export function TransactionsTable({
     setRuleMessage(null);
     setRuleDraft({
       txId: tx.id,
-      matchField: tx.merchant_name ? "merchant_name" : "name",
+      // Default to requiring both fields when there's a merchant name to
+      // match against -- more precise than either field alone, since a raw
+      // description often contains extra noise (location, a trailing
+      // reference number) that a plain "name"-only rule would need to avoid.
+      matchField: tx.merchant_name ? "both" : "name",
       matchValue: tx.merchant_name ?? tx.name,
       matchType: "contains",
       categoryId: tx.category_id ?? categories[0]?.id ?? "",
@@ -221,8 +225,9 @@ export function TransactionsTable({
               }
               className="rounded-md border border-zinc-300 px-2 py-2 text-sm outline-none dark:border-zinc-700 dark:bg-zinc-900"
             >
-              <option value="name">description</option>
+              <option value="both">merchant name &amp; description</option>
               <option value="merchant_name">merchant name</option>
+              <option value="name">description</option>
             </select>
           </div>
           <div className="flex flex-col gap-1">

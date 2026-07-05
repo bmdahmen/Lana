@@ -75,10 +75,16 @@ export function defaultCategoryFromLabel(label: string | null | undefined): stri
 }
 
 export interface CategoryRule {
-  match_field: "merchant_name" | "name";
+  match_field: "merchant_name" | "name" | "both";
   match_type: "contains" | "equals";
   match_value: string;
   category_id: string;
+}
+
+function fieldMatches(value: string | null, matchType: "contains" | "equals", needle: string): boolean {
+  if (!value) return false;
+  const haystack = value.toLowerCase();
+  return matchType === "equals" ? haystack === needle : haystack.includes(needle);
 }
 
 export function applyCategoryRules(
@@ -86,11 +92,16 @@ export function applyCategoryRules(
   transaction: { name: string; merchant_name: string | null }
 ): string | null {
   for (const rule of rules) {
-    const value = rule.match_field === "merchant_name" ? transaction.merchant_name : transaction.name;
-    if (!value) continue;
-    const haystack = value.toLowerCase();
     const needle = rule.match_value.toLowerCase();
-    const matched = rule.match_type === "equals" ? haystack === needle : haystack.includes(needle);
+    const matched =
+      rule.match_field === "both"
+        ? fieldMatches(transaction.merchant_name, rule.match_type, needle) &&
+          fieldMatches(transaction.name, rule.match_type, needle)
+        : fieldMatches(
+            rule.match_field === "merchant_name" ? transaction.merchant_name : transaction.name,
+            rule.match_type,
+            needle
+          );
     if (matched) return rule.category_id;
   }
   return null;
