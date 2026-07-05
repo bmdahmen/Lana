@@ -15,6 +15,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Lana",
   description: "Personal finance aggregation and net worth tracking",
+  appleWebApp: {
+    capable: true,
+    title: "Lana",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export const viewport: Viewport = {
