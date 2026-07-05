@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   const limit = Math.min(Number(searchParams.get("limit") ?? 100), 500);
   const offset = Number(searchParams.get("offset") ?? 0);
 
-  const conditions: string[] = [];
+  const conditions: string[] = ["a.is_closed = 0", "a.is_hidden = 0"];
   const bindings: unknown[] = [];
 
   if (accountId) {
@@ -59,7 +59,8 @@ export async function GET(request: Request) {
   // Only the plain, unfiltered first page is worth caching -- it's what every
   // tab switch to Transactions loads, whereas filtered/paged queries are each
   // hit once and would just bloat the cache.
-  const isDefaultQuery = conditions.length === 0 && limit === 100 && offset === 0;
+  const hasUserFilter = Boolean(accountId || categoryId || search || from || to);
+  const isDefaultQuery = !hasUserFilter && limit === 100 && offset === 0;
   const transactions = isDefaultQuery
     ? await getCached(CACHE_KEYS.transactionsDefault, runQuery)
     : await runQuery();

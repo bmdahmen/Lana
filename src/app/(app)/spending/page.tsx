@@ -30,9 +30,11 @@ export default async function SpendingPage() {
         `SELECT c.id as category_id, c.name as category_name, c.icon as category_icon,
                 SUM(t.amount) as total, COUNT(*) as count
          FROM "transaction" t
+         JOIN account a ON a.id = t.account_id
          LEFT JOIN category c ON c.id = t.category_id
          WHERE t.category_id != 'cat_income' AND t.category_id != 'cat_transfer'
            AND t.amount > 0 AND t.date >= ?
+           AND a.is_closed = 0 AND a.is_hidden = 0
          GROUP BY t.category_id
          ORDER BY total DESC`
       )
