@@ -72,18 +72,3 @@ export function derivePlaidAssetClass(type: string, subtype: string | null): Ass
 export function isAssetClassLiability(assetClass: AssetClass): boolean {
   return assetClass === "liabilities";
 }
-
-export function deriveMxAssetClass(type: string, subtype: string | null): AssetClass {
-  const upperType = type.toUpperCase();
-  const lowerSubtype = subtype?.toLowerCase() ?? "";
-
-  if (upperType === "CHECKING" || upperType === "SAVINGS") return "cash";
-  if (upperType === "CREDIT_CARD" || upperType === "LOAN" || upperType === "MORTGAGE") {
-    return "liabilities";
-  }
-  if (upperType === "INVESTMENT") {
-    if (/401|403|ira|pension|retirement/.test(lowerSubtype)) return "retirement";
-    return "brokerage";
-  }
-  return "other";
-}

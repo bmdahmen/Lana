@@ -6,7 +6,6 @@ import { AddManualAccountButton } from "@/components/add-manual-account-button";
 import { AccountRowActions } from "@/components/account-row-actions";
 import { AccountCategorySelect } from "@/components/account-category-select";
 import { LinkAccountButton } from "@/components/link-account-button";
-import { LinkMxAccountButton } from "@/components/link-mx-account-button";
 import { ImportCsvButton } from "@/components/import-csv-button";
 
 interface AccountRow {
@@ -53,7 +52,6 @@ export default async function AccountsPage() {
 
       <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
         <LinkAccountButton />
-        <LinkMxAccountButton />
         <AddManualAccountButton />
         <ImportCsvButton accounts={accounts.map((a) => ({ id: a.id, name: a.name }))} />
       </div>
