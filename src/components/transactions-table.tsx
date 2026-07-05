@@ -286,15 +286,15 @@ export function TransactionsTable({
       {transactions.length > 0 && (
         <>
           {/* Mobile: card list */}
-          <ul className="flex flex-col gap-3 md:hidden">
+          <ul className="flex flex-col gap-1.5 md:hidden">
             {transactions.map((tx) => (
               <li
                 key={tx.id}
-                className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950"
+                className="rounded-xl border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-950"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate font-medium text-zinc-900 dark:text-zinc-50">
+                    <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
                       {tx.merchant_name ?? tx.name}
                       {tx.pending === 1 && (
                         <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-normal text-zinc-500 dark:bg-zinc-800">
@@ -302,7 +302,7 @@ export function TransactionsTable({
                         </span>
                       )}
                     </p>
-                    <p className="mt-0.5 text-xs text-zinc-500">
+                    <p className="text-xs text-zinc-500">
                       {tx.account_name} · {formatDate(tx.date)}
                     </p>
                   </div>
@@ -314,11 +314,11 @@ export function TransactionsTable({
                     {formatCurrency(Math.abs(tx.amount))}
                   </span>
                 </div>
-                <div className="mt-3 flex items-center gap-2">
+                <div className="mt-1.5 flex items-center gap-2">
                   <select
                     value={tx.category_id ?? ""}
                     onChange={(e) => updateCategory(tx.id, e.target.value)}
-                    className="w-full rounded-md border border-zinc-300 bg-transparent px-2 py-1.5 text-xs outline-none dark:border-zinc-700"
+                    className="w-full rounded-md border border-zinc-300 bg-transparent px-2 py-1 text-xs outline-none dark:border-zinc-700"
                   >
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -336,7 +336,7 @@ export function TransactionsTable({
                   </button>
                 </div>
                 {ruleDraft?.txId === tx.id && (
-                  <div className="mt-3">
+                  <div className="mt-2">
                     <RuleDraftForm />
                   </div>
                 )}
