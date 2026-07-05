@@ -7,7 +7,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { NetWorthDashboard } from "@/components/net-worth-dashboard";
 import { getCached, CACHE_KEYS } from "@/lib/cache";
 
-const HERO_DEFAULT_DAYS = HOME_RANGES.find((r) => r.label === "1Y")?.days ?? 365;
+const HERO_DEFAULT_DAYS = HOME_RANGES.find((r) => r.label === "5Y")?.days ?? 1825;
 
 interface RecentTransaction {
   id: string;
