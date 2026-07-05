@@ -35,6 +35,13 @@
   --negative-fill: rgba(255, 91, 74, 0.12);
 }
 
+html {
+  /* Without this, iOS Safari's own elastic bounce fires on top of (and
+     dwarfs) our custom pull-to-refresh indicator below, so pulling down
+     just reveals a big blank gap with no visible feedback. */
+  overscroll-behavior-y: contain;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
