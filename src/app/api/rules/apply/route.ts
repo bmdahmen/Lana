@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
+import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 import { applyCategoryRules, type CategoryRule } from "@/lib/categorize";
 
 const BATCH_SIZE = 50;
@@ -47,6 +48,10 @@ export async function POST() {
           .bind(u.categoryId, u.id)
       )
     );
+  }
+
+  if (updates.length > 0) {
+    await invalidateCache(CACHE_KEYS.transactionsDefault, CACHE_KEYS.homeDashboard);
   }
 
   return NextResponse.json({ ok: true, updated: updates.length });

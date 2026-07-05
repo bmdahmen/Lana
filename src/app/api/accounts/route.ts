@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getDB, newId } from "@/lib/db";
+import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 import { recomputeNetWorth } from "@/lib/sync";
 import { isAssetClassLiability, PRECIOUS_METALS } from "@/lib/asset-classes";
 import { getSpotPrices } from "@/lib/spot-price";
@@ -99,6 +100,7 @@ export async function POST(request: Request) {
     .run();
 
   await recomputeNetWorth(db, { force: true });
+  await invalidateCache(CACHE_KEYS.accountsList, CACHE_KEYS.homeDashboard);
 
   return NextResponse.json({ ok: true, id });
 }

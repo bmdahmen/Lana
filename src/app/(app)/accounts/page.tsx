@@ -1,4 +1,5 @@
 import { getDB } from "@/lib/db";
+import { getCached, CACHE_KEYS } from "@/lib/cache";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { type AssetClass, type PreciousMetal } from "@/lib/asset-classes";
 import { recomputeAccountBalances } from "@/lib/sync";
@@ -30,19 +31,21 @@ interface AccountRow {
 export default async function AccountsPage() {
   const db = await getDB();
   await recomputeAccountBalances(db);
-  const result = await db
-    .prepare(
-      `SELECT a.id, a.name, a.official_name, a.mask, a.current_balance, a.is_manual, a.is_hidden,
-              a.asset_class, p.institution_name, p.status as item_status,
-              a.precious_metal, a.metal_troy_oz, a.relevant_from, a.relevant_until,
-              a.property_address
-       FROM account a
-       LEFT JOIN plaid_item p ON p.id = a.plaid_item_id
-       WHERE a.is_closed = 0
-       ORDER BY (a.relevant_until IS NOT NULL) ASC, a.is_hidden ASC, a.asset_class ASC, a.current_balance DESC`
-    )
-    .all<AccountRow>();
-  const accounts = result.results ?? [];
+  const accounts = await getCached(CACHE_KEYS.accountsList, async () => {
+    const result = await db
+      .prepare(
+        `SELECT a.id, a.name, a.official_name, a.mask, a.current_balance, a.is_manual, a.is_hidden,
+                a.asset_class, p.institution_name, p.status as item_status,
+                a.precious_metal, a.metal_troy_oz, a.relevant_from, a.relevant_until,
+                a.property_address
+         FROM account a
+         LEFT JOIN plaid_item p ON p.id = a.plaid_item_id
+         WHERE a.is_closed = 0
+         ORDER BY (a.relevant_until IS NOT NULL) ASC, a.is_hidden ASC, a.asset_class ASC, a.current_balance DESC`
+      )
+      .all<AccountRow>();
+    return result.results ?? [];
+  });
 
   return (
     <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">

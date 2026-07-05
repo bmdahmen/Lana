@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getDB } from "@/lib/db";
+import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 import { recomputeNetWorth } from "@/lib/sync";
 import { isAssetClassLiability } from "@/lib/asset-classes";
 import { getSpotPrices } from "@/lib/spot-price";
@@ -109,6 +110,7 @@ export async function PATCH(
       .bind(...bindings, id)
       .run();
     await recomputeNetWorth(db, { force: true });
+    await invalidateCache(CACHE_KEYS.accountsList, CACHE_KEYS.homeDashboard);
   }
 
   return NextResponse.json({ ok: true });

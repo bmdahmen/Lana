@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getDB } from "@/lib/db";
+import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 
 const updateSchema = z.object({
   categoryId: z.string().optional(),
@@ -34,6 +35,8 @@ export async function PATCH(
       .bind(body.data.notes, id)
       .run();
   }
+
+  await invalidateCache(CACHE_KEYS.transactionsDefault, CACHE_KEYS.homeDashboard);
 
   return NextResponse.json({ ok: true });
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
+import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 import { syncPlaidItem } from "@/lib/sync";
 
 export async function POST(request: Request) {
@@ -23,6 +24,11 @@ export async function POST(request: Request) {
       .first<{ id: string; access_token: string; cursor: string | null }>();
     if (item) {
       await syncPlaidItem(db, item);
+      await invalidateCache(
+        CACHE_KEYS.transactionsDefault,
+        CACHE_KEYS.accountsList,
+        CACHE_KEYS.homeDashboard
+      );
     }
   }
 

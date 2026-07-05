@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
+import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 import { recomputeAccountBalances } from "@/lib/sync";
 
 /**
@@ -15,5 +16,6 @@ export async function POST(request: Request) {
 
   const db = await getDB();
   await recomputeAccountBalances(db, { force: true });
+  await invalidateCache(CACHE_KEYS.homeDashboard);
   return NextResponse.json({ ok: true });
 }

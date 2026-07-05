@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getDB, newId } from "@/lib/db";
+import { getCached, invalidateCache, CACHE_KEYS } from "@/lib/cache";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -39,20 +40,31 @@ export async function GET(request: Request) {
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
   const db = await getDB();
-  const result = await db
-    .prepare(
-      `SELECT t.*, a.name as account_name, c.name as category_name, c.icon as category_icon
-       FROM "transaction" t
-       JOIN account a ON a.id = t.account_id
-       LEFT JOIN category c ON c.id = t.category_id
-       ${where}
-       ORDER BY t.date DESC, t.created_at DESC
-       LIMIT ? OFFSET ?`
-    )
-    .bind(...bindings, limit, offset)
-    .all();
+  const runQuery = async () => {
+    const result = await db
+      .prepare(
+        `SELECT t.*, a.name as account_name, c.name as category_name, c.icon as category_icon
+         FROM "transaction" t
+         JOIN account a ON a.id = t.account_id
+         LEFT JOIN category c ON c.id = t.category_id
+         ${where}
+         ORDER BY t.date DESC, t.created_at DESC
+         LIMIT ? OFFSET ?`
+      )
+      .bind(...bindings, limit, offset)
+      .all();
+    return result.results ?? [];
+  };
 
-  return NextResponse.json({ transactions: result.results ?? [] });
+  // Only the plain, unfiltered first page is worth caching -- it's what every
+  // tab switch to Transactions loads, whereas filtered/paged queries are each
+  // hit once and would just bloat the cache.
+  const isDefaultQuery = conditions.length === 0 && limit === 100 && offset === 0;
+  const transactions = isDefaultQuery
+    ? await getCached(CACHE_KEYS.transactionsDefault, runQuery)
+    : await runQuery();
+
+  return NextResponse.json({ transactions });
 }
 
 const createSchema = z.object({
@@ -89,6 +101,8 @@ export async function POST(request: Request) {
       body.data.notes ?? null
     )
     .run();
+
+  await invalidateCache(CACHE_KEYS.transactionsDefault, CACHE_KEYS.homeDashboard);
 
   return NextResponse.json({ ok: true, id });
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDB, newId } from "@/lib/db";
+import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 import { parseTransactionsFromCsv } from "@/lib/csv-import";
 import { applyCategoryRules, defaultCategoryFromLabel, type CategoryRule } from "@/lib/categorize";
 import { recomputeNetWorth } from "@/lib/sync";
@@ -66,6 +67,11 @@ export async function POST(request: Request) {
   }
 
   await recomputeNetWorth(db, { force: true });
+  await invalidateCache(
+    CACHE_KEYS.transactionsDefault,
+    CACHE_KEYS.accountsList,
+    CACHE_KEYS.homeDashboard
+  );
 
   return NextResponse.json({ ok: true, imported, skipped });
 }

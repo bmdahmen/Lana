@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { getDB } from "@/lib/db";
 import { recomputeAccountBalances } from "@/lib/sync";
-import { getNetWorthSeries } from "@/lib/queries";
+import { getNetWorthSeries, type NetWorthByClassPoint } from "@/lib/queries";
 import { type AssetClass } from "@/lib/asset-classes";
 import { HOME_RANGES } from "@/lib/net-worth-range";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { NetWorthDashboard } from "@/components/net-worth-dashboard";
 import { PrefetchRoute } from "@/components/prefetch-route";
+import { getCached, CACHE_KEYS } from "@/lib/cache";
 
 const HERO_DEFAULT_DAYS = HOME_RANGES.find((r) => r.label === "1Y")?.days ?? 365;
 
@@ -30,40 +31,57 @@ interface AccountSummaryRow {
   updated_at: string;
 }
 
+interface DashboardData {
+  byClassPoints: NetWorthByClassPoint[];
+  accountCount: number;
+  recentTransactions: RecentTransaction[];
+  accountsByClass: AccountSummaryRow[];
+}
+
 export default async function DashboardPage() {
   const db = await getDB();
   await recomputeAccountBalances(db);
 
-  const byClassPoints = await getNetWorthSeries(db);
+  const { byClassPoints, accountCount, recentTransactions, accountsByClass } = await getCached(
+    CACHE_KEYS.homeDashboard,
+    async (): Promise<DashboardData> => {
+      const byClassPoints = await getNetWorthSeries(db);
 
-  const accountCount = await db
-    .prepare("SELECT COUNT(*) as count FROM account WHERE is_closed = 0")
-    .first<{ count: number }>();
+      const accountCountRow = await db
+        .prepare("SELECT COUNT(*) as count FROM account WHERE is_closed = 0")
+        .first<{ count: number }>();
 
-  const recentResult = await db
-    .prepare(
-      `SELECT t.id, t.name, t.merchant_name, t.amount, t.date, a.name as account_name,
-              c.name as category_name, c.icon as category_icon
-       FROM "transaction" t
-       JOIN account a ON a.id = t.account_id
-       LEFT JOIN category c ON c.id = t.category_id
-       ORDER BY t.date DESC, t.created_at DESC
-       LIMIT 8`
-    )
-    .all<RecentTransaction>();
-  const recentTransactions = recentResult.results ?? [];
+      const recentResult = await db
+        .prepare(
+          `SELECT t.id, t.name, t.merchant_name, t.amount, t.date, a.name as account_name,
+                  c.name as category_name, c.icon as category_icon
+           FROM "transaction" t
+           JOIN account a ON a.id = t.account_id
+           LEFT JOIN category c ON c.id = t.category_id
+           ORDER BY t.date DESC, t.created_at DESC
+           LIMIT 8`
+        )
+        .all<RecentTransaction>();
 
-  const today = new Date().toISOString().slice(0, 10);
-  const accountsResult = await db
-    .prepare(
-      `SELECT id, name, asset_class, current_balance, mask, updated_at FROM account
-       WHERE is_closed = 0 AND is_hidden = 0
-         AND (relevant_until IS NULL OR relevant_until >= ?)
-       ORDER BY current_balance DESC`
-    )
-    .bind(today)
-    .all<AccountSummaryRow>();
-  const accountsByClass = accountsResult.results ?? [];
+      const today = new Date().toISOString().slice(0, 10);
+      const accountsResult = await db
+        .prepare(
+          `SELECT id, name, asset_class, current_balance, mask, updated_at FROM account
+           WHERE is_closed = 0 AND is_hidden = 0
+             AND (relevant_until IS NULL OR relevant_until >= ?)
+           ORDER BY current_balance DESC`
+        )
+        .bind(today)
+        .all<AccountSummaryRow>();
+
+      return {
+        byClassPoints,
+        accountCount: accountCountRow?.count ?? 0,
+        recentTransactions: recentResult.results ?? [],
+        accountsByClass: accountsResult.results ?? [],
+      };
+    }
+  );
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col">
@@ -97,7 +115,7 @@ export default async function DashboardPage() {
         </div>
         <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
           {recentTransactions.length === 0 ? (
-            <EmptyState accountCount={accountCount?.count ?? 0} />
+            <EmptyState accountCount={accountCount} />
           ) : (
             <ul className="flex flex-col divide-y divide-zinc-100 dark:divide-zinc-900">
               {recentTransactions.map((tx) => (
