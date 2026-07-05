@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { unsealData } from "iron-session";
 
-const PUBLIC_PATHS = ["/login", "/api/auth/google"];
+// "/api/zillow/debug" is a temporary diagnostic route -- remove this
+// exemption when that route is removed.
+const PUBLIC_PATHS = ["/login", "/api/auth/google", "/api/zillow/debug"];
 
 async function hasValidSession(request: NextRequest): Promise<boolean> {
   const cookie = request.cookies.get("lana_session")?.value;
