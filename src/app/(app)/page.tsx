@@ -6,6 +6,7 @@ import { type AssetClass } from "@/lib/asset-classes";
 import { HOME_RANGES } from "@/lib/net-worth-range";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { NetWorthDashboard } from "@/components/net-worth-dashboard";
+import { PrefetchRoute } from "@/components/prefetch-route";
 
 const HERO_DEFAULT_DAYS = HOME_RANGES.find((r) => r.label === "1Y")?.days ?? 365;
 
@@ -66,6 +67,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col">
+      <PrefetchRoute href="/transactions" />
       <header className="flex items-center justify-between px-4 pt-6 pb-2 sm:px-8 md:hidden">
         <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Lana</span>
         <Link
