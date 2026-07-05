@@ -32,9 +32,11 @@ async function markRecomputed(db: D1Database): Promise<void> {
 
 /**
  * Refreshes metal, real-estate, and net-worth balances together, at most
- * once per throttle window. Pages call this on every render, so without the
- * throttle each visit would re-run this whole pipeline (including sequential
- * writes) even when nothing has changed since the last visit.
+ * once per throttle window. Called from the nightly cron
+ * (api/cron/snapshot) and the manual-refresh API route
+ * (api/net-worth/recompute), so the throttle guards against back-to-back
+ * invocations re-running this whole pipeline (including sequential writes)
+ * when nothing has changed since the last run.
  */
 export async function recomputeAccountBalances(
   db: D1Database,

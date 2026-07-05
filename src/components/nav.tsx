@@ -40,6 +40,7 @@ export function BottomNav() {
             <li key={tab.href} className="flex-1">
               <Link
                 href={tab.href}
+                prefetch={true}
                 className={clsx(
                   "flex flex-col items-center gap-1 py-2 text-[11px] font-medium transition-colors",
                   active
@@ -70,6 +71,7 @@ export function SideNav() {
             <li key={link.href}>
               <Link
                 href={link.href}
+                prefetch={true}
                 className={clsx(
                   "block rounded-md px-3 py-2 text-sm font-medium transition-colors",
                   isActive(pathname, link.href)

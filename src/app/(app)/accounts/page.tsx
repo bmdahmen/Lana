@@ -2,7 +2,6 @@ import { getDB } from "@/lib/db";
 import { getCached, CACHE_KEYS } from "@/lib/cache";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { type AssetClass, type PreciousMetal, type Cryptocurrency } from "@/lib/asset-classes";
-import { recomputeAccountBalances } from "@/lib/sync";
 import { AddManualAccountButton } from "@/components/add-manual-account-button";
 import { AccountRowActions } from "@/components/account-row-actions";
 import { AccountCategorySelect } from "@/components/account-category-select";
@@ -32,7 +31,6 @@ interface AccountRow {
 
 export default async function AccountsPage() {
   const db = await getDB();
-  await recomputeAccountBalances(db);
   const accounts = await getCached(CACHE_KEYS.accountsList, async () => {
     const result = await db
       .prepare(

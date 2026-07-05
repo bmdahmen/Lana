@@ -1,12 +1,10 @@
 import Link from "next/link";
 import { getDB } from "@/lib/db";
-import { recomputeAccountBalances } from "@/lib/sync";
 import { getNetWorthSeries, type NetWorthByClassPoint } from "@/lib/queries";
 import { type AssetClass } from "@/lib/asset-classes";
 import { HOME_RANGES } from "@/lib/net-worth-range";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { NetWorthDashboard } from "@/components/net-worth-dashboard";
-import { PrefetchRoute } from "@/components/prefetch-route";
 import { getCached, CACHE_KEYS } from "@/lib/cache";
 
 const HERO_DEFAULT_DAYS = HOME_RANGES.find((r) => r.label === "1Y")?.days ?? 365;
@@ -40,39 +38,38 @@ interface DashboardData {
 
 export default async function DashboardPage() {
   const db = await getDB();
-  await recomputeAccountBalances(db);
 
   const { byClassPoints, accountCount, recentTransactions, accountsByClass } = await getCached(
     CACHE_KEYS.homeDashboard,
     async (): Promise<DashboardData> => {
-      const byClassPoints = await getNetWorthSeries(db);
-
-      const accountCountRow = await db
-        .prepare("SELECT COUNT(*) as count FROM account WHERE is_closed = 0")
-        .first<{ count: number }>();
-
-      const recentResult = await db
-        .prepare(
-          `SELECT t.id, t.name, t.merchant_name, t.amount, t.date, a.name as account_name,
-                  c.name as category_name, c.icon as category_icon
-           FROM "transaction" t
-           JOIN account a ON a.id = t.account_id
-           LEFT JOIN category c ON c.id = t.category_id
-           ORDER BY t.date DESC, t.created_at DESC
-           LIMIT 8`
-        )
-        .all<RecentTransaction>();
-
       const today = new Date().toISOString().slice(0, 10);
-      const accountsResult = await db
-        .prepare(
-          `SELECT id, name, asset_class, current_balance, mask, updated_at FROM account
-           WHERE is_closed = 0 AND is_hidden = 0
-             AND (relevant_until IS NULL OR relevant_until >= ?)
-           ORDER BY current_balance DESC`
-        )
-        .bind(today)
-        .all<AccountSummaryRow>();
+
+      const [byClassPoints, accountCountRow, recentResult, accountsResult] = await Promise.all([
+        getNetWorthSeries(db),
+        db
+          .prepare("SELECT COUNT(*) as count FROM account WHERE is_closed = 0")
+          .first<{ count: number }>(),
+        db
+          .prepare(
+            `SELECT t.id, t.name, t.merchant_name, t.amount, t.date, a.name as account_name,
+                    c.name as category_name, c.icon as category_icon
+             FROM "transaction" t
+             JOIN account a ON a.id = t.account_id
+             LEFT JOIN category c ON c.id = t.category_id
+             ORDER BY t.date DESC, t.created_at DESC
+             LIMIT 8`
+          )
+          .all<RecentTransaction>(),
+        db
+          .prepare(
+            `SELECT id, name, asset_class, current_balance, mask, updated_at FROM account
+             WHERE is_closed = 0 AND is_hidden = 0
+               AND (relevant_until IS NULL OR relevant_until >= ?)
+             ORDER BY current_balance DESC`
+          )
+          .bind(today)
+          .all<AccountSummaryRow>(),
+      ]);
 
       return {
         byClassPoints,
@@ -85,7 +82,6 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col">
-      <PrefetchRoute href="/transactions" />
       <header className="flex items-center justify-between px-4 pt-6 pb-2 sm:px-8 md:hidden">
         <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Lana</span>
         <Link

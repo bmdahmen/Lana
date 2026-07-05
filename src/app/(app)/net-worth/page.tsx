@@ -1,5 +1,4 @@
 import { getDB } from "@/lib/db";
-import { recomputeNetWorth } from "@/lib/sync";
 import { getNetWorthSeries } from "@/lib/queries";
 import { NetWorthHistory } from "@/components/net-worth-history";
 import { HISTORY_RANGES } from "@/lib/net-worth-range";
@@ -8,7 +7,6 @@ const DEFAULT_DAYS = HISTORY_RANGES[HISTORY_RANGES.length - 1].days;
 
 export default async function NetWorthPage() {
   const db = await getDB();
-  await recomputeNetWorth(db);
 
   const points = await getNetWorthSeries(db);
 
