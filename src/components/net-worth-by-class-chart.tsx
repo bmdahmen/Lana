@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   LineChart,
   Line,
@@ -56,19 +56,29 @@ export function NetWorthByClassChart({
   onScrub?: (point: NetWorthByClassPoint | null) => void;
 }) {
   const suppressMouseUntilRef = useRef(0);
+  // Tracks hover/scrub state ourselves rather than trusting recharts' own
+  // active-tooltip state: recharts never clears that state on touchend (only
+  // on a real mouseleave), so its activeDot/cursor rendering would otherwise
+  // stay frozen at the last touched point after the finger lifts.
+  const [isScrubbing, setIsScrubbing] = useState(false);
 
   const handleScrub = useCallback(
     (point: NetWorthByClassPoint | null) => {
       if (Date.now() < suppressMouseUntilRef.current) return;
+      setIsScrubbing(point !== null);
       onScrub?.(point);
     },
     [onScrub]
   );
 
-  const handleReleased = useCallback(() => onScrub?.(null), [onScrub]);
+  const handleReleased = useCallback(() => {
+    setIsScrubbing(false);
+    onScrub?.(null);
+  }, [onScrub]);
 
   const handleTouchEnded = useCallback(() => {
     suppressMouseUntilRef.current = Date.now() + TOUCH_MOUSE_SUPPRESS_MS;
+    setIsScrubbing(false);
     onScrub?.(null);
   }, [onScrub]);
 
@@ -110,7 +120,10 @@ export function NetWorthByClassChart({
           />
           {/* No content: we read the hover/scrub state via hooks above and
               render the values below the chart instead of a floating box. */}
-          <Tooltip content={() => null} cursor={{ stroke: "var(--chart-axis)", strokeWidth: 1 }} />
+          <Tooltip
+            content={() => null}
+            cursor={isScrubbing ? { stroke: "var(--chart-axis)", strokeWidth: 1 } : false}
+          />
           <Line
             type="monotone"
             dataKey="net_worth"
@@ -119,7 +132,7 @@ export function NetWorthByClassChart({
             strokeWidth={3}
             dot={false}
             isAnimationActive={false}
-            activeDot={{ r: 4, strokeWidth: 2, fill: "var(--background)" }}
+            activeDot={isScrubbing ? { r: 4, strokeWidth: 2, fill: "var(--background)" } : false}
           />
           {activeClasses.map((cls) => (
             <Line
@@ -131,7 +144,7 @@ export function NetWorthByClassChart({
               strokeWidth={2}
               dot={false}
               isAnimationActive={false}
-              activeDot={{ r: 3 }}
+              activeDot={isScrubbing ? { r: 3 } : false}
             />
           ))}
         </LineChart>
