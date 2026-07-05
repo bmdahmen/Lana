@@ -36,10 +36,13 @@
 }
 
 html {
-  /* Without this, iOS Safari's own elastic bounce fires on top of (and
-     dwarfs) our custom pull-to-refresh indicator below, so pulling down
-     just reveals a big blank gap with no visible feedback. */
-  overscroll-behavior-y: contain;
+  /* `none`, not `contain` -- `contain` still lets the local rubber-band
+     bounce animate (it only stops the gesture from chaining up to the
+     browser's own reload/back-swipe), so iOS Safari would still show its
+     own blank elastic-bounce gap on top of our custom pull-to-refresh
+     indicator below. `none` suppresses the bounce animation entirely, so
+     our indicator is the only visible feedback while pulling. */
+  overscroll-behavior-y: none;
 }
 
 body {

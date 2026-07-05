@@ -6,6 +6,7 @@ import clsx from "clsx";
 import type { ReactNode } from "react";
 import { LogoutButton } from "@/components/logout-button";
 import { Logo } from "@/components/logo";
+import { SyncButton } from "@/components/sync-button";
 
 const TABS: { href: string; label: string; icon: (active: boolean) => ReactNode }[] = [
   { href: "/", label: "Home", icon: HomeIcon },
@@ -66,7 +67,10 @@ export function SideNav() {
   return (
     <nav className="hidden w-56 shrink-0 flex-col justify-between border-r border-zinc-200 bg-white p-6 md:flex dark:border-zinc-800 dark:bg-zinc-950">
       <div>
-        <Logo className="mb-8" iconSize={30} />
+        <div className="mb-8 flex items-center justify-between">
+          <Logo iconSize={30} />
+          <SyncButton />
+        </div>
         <ul className="flex flex-col gap-1">
           {SIDE_LINKS.map((link) => (
             <li key={link.href}>
