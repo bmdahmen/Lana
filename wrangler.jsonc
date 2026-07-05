@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "lana",
-  "main": ".open-next/worker.js",
+  "main": "worker-entry.ts",
   "compatibility_date": "2026-06-01",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
@@ -17,5 +17,11 @@
   ],
   "observability": {
     "enabled": true
+  },
+  // Daily balance snapshot -- see worker-entry.ts's scheduled() handler and
+  // src/app/api/cron/snapshot/route.ts. Requires a CRON_SECRET set via
+  // `wrangler secret put CRON_SECRET` (see .env.example).
+  "triggers": {
+    "crons": ["0 12 * * *"]
   }
 }
