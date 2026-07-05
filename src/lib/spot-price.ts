@@ -10,7 +10,7 @@ const SPOT_PRICE_MAX_AGE_MS = 60 * 60 * 1000;
 type SpotSymbol = PreciousMetal | Cryptocurrency;
 
 const METAL_SYMBOL: Record<PreciousMetal, "XAU" | "XAG"> = { gold: "XAU", silver: "XAG" };
-const CRYPTO_ID: Record<Cryptocurrency, "bitcoin" | "ethereum"> = { btc: "bitcoin", eth: "ethereum" };
+const CRYPTO_SYMBOL: Record<Cryptocurrency, "BTC" | "ETH"> = { btc: "BTC", eth: "ETH" };
 
 async function fetchMetalSpotPrices(): Promise<Record<PreciousMetal, number>> {
   const [gold, silver] = await Promise.all(
@@ -24,12 +24,19 @@ async function fetchMetalSpotPrices(): Promise<Record<PreciousMetal, number>> {
   return { gold, silver };
 }
 
+// CoinGecko's public API consistently fails from Cloudflare Workers (shared
+// egress IPs get rate-limited/blocked), so this uses Coinbase's public spot
+// endpoint instead, which doesn't have that problem.
 async function fetchCryptoSpotPrices(): Promise<Record<Cryptocurrency, number>> {
-  const ids = CRYPTOCURRENCIES.map((c) => CRYPTO_ID[c]).join(",");
-  const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`);
-  if (!res.ok) throw new Error(`Spot price fetch failed for crypto: ${res.status}`);
-  const data = (await res.json()) as Record<string, { usd: number }>;
-  return { btc: data[CRYPTO_ID.btc].usd, eth: data[CRYPTO_ID.eth].usd };
+  const [btc, eth] = await Promise.all(
+    CRYPTOCURRENCIES.map(async (coin) => {
+      const res = await fetch(`https://api.coinbase.com/v2/prices/${CRYPTO_SYMBOL[coin]}-USD/spot`);
+      if (!res.ok) throw new Error(`Spot price fetch failed for ${coin}: ${res.status}`);
+      const data = (await res.json()) as { data: { amount: string } };
+      return Number(data.data.amount);
+    })
+  );
+  return { btc, eth };
 }
 
 async function refreshGroup<T extends SpotSymbol>(
@@ -57,11 +64,14 @@ async function refreshGroup<T extends SpotSymbol>(
       `Failed to refresh spot prices for ${symbols.join(", ")}, falling back to cache`,
       (error as Error).message
     );
+    // Even with no prior cache (e.g. the very first crypto/metal account ever
+    // added), fall back to 0 rather than throwing -- a transient price-API
+    // outage should never block adding the account. The balance corrects
+    // itself the next time this succeeds (next add, or the daily cron).
     const fallback = {} as Record<T, number>;
     for (const symbol of symbols) {
       const row = cached.get(symbol);
-      if (!row) throw error;
-      fallback[symbol] = row.price_usd;
+      fallback[symbol] = row?.price_usd ?? 0;
     }
     return fallback;
   }

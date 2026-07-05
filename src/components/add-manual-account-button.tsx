@@ -180,6 +180,7 @@ export function AddManualAccountButton() {
                     <input
                       required
                       type="number"
+                      inputMode="decimal"
                       step="0.001"
                       min="0"
                       value={troyOz}
@@ -220,6 +221,7 @@ export function AddManualAccountButton() {
                     <input
                       required
                       type="number"
+                      inputMode="decimal"
                       step="0.00000001"
                       min="0"
                       value={cryptoAmount}
@@ -285,6 +287,7 @@ export function AddManualAccountButton() {
                   <input
                     required
                     type="number"
+                    inputMode="decimal"
                     step="0.01"
                     value={balance}
                     onChange={(e) => setBalance(e.target.value)}
@@ -309,6 +312,7 @@ export function AddManualAccountButton() {
                   <input
                     required
                     type="number"
+                    inputMode="decimal"
                     step="0.01"
                     value={balance}
                     onChange={(e) => setBalance(e.target.value)}
