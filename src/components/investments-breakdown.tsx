@@ -4,16 +4,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatCurrency } from "@/lib/format";
 import { TransactionsTable } from "@/components/transactions-table";
 import { buildMonthOptions } from "@/lib/month-range";
+import { ASSET_CLASSES } from "@/lib/asset-classes";
 
 const MONTHS_BACK = 12;
 
 type InvestmentAssetClass = "brokerage" | "retirement" | "crypto";
 
-const ASSET_CLASS_FILTERS: { id: InvestmentAssetClass; label: string; icon: string }[] = [
-  { id: "brokerage", label: "Brokerage", icon: "📈" },
-  { id: "retirement", label: "Retirement", icon: "🏦" },
-  { id: "crypto", label: "Crypto", icon: "🪙" },
-];
+const INVESTMENT_CLASS_IDS: InvestmentAssetClass[] = ["brokerage", "retirement", "crypto"];
+const ASSET_CLASS_FILTERS = ASSET_CLASSES.filter(
+  (c): c is typeof c & { id: InvestmentAssetClass } =>
+    INVESTMENT_CLASS_IDS.includes(c.id as InvestmentAssetClass)
+);
 
 interface BreakdownRow {
   account_id: string;
