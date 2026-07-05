@@ -51,9 +51,15 @@ const TOUCH_MOUSE_SUPPRESS_MS = 500;
 export function NetWorthByClassChart({
   points,
   onScrub,
+  visibleKeys,
 }: {
   points: NetWorthByClassPoint[];
   onScrub?: (point: NetWorthByClassPoint | null) => void;
+  /** Restricts which lines render (net_worth + asset-class ids). Omit to show
+   *  every class with nonzero data, plus the Net Worth total, as before --
+   *  the Y axis rescales automatically to whatever lines are actually
+   *  rendered, so hiding a line here is enough to shrink/grow the axis. */
+  visibleKeys?: Set<string>;
 }) {
   const suppressMouseUntilRef = useRef(0);
   // Tracks hover/scrub state ourselves rather than trusting recharts' own
@@ -90,9 +96,11 @@ export function NetWorthByClassChart({
     );
   }
 
-  const activeClasses = NET_WORTH_DISPLAY_CLASSES.filter((cls) =>
-    points.some((p) => Number(p[cls.id] ?? 0) !== 0)
+  const activeClasses = NET_WORTH_DISPLAY_CLASSES.filter(
+    (cls) =>
+      points.some((p) => Number(p[cls.id] ?? 0) !== 0) && (!visibleKeys || visibleKeys.has(cls.id))
   );
+  const showNetWorth = !visibleKeys || visibleKeys.has("net_worth");
 
   return (
     <div
@@ -124,16 +132,18 @@ export function NetWorthByClassChart({
             content={() => null}
             cursor={isScrubbing ? { stroke: "var(--chart-axis)", strokeWidth: 1 } : false}
           />
-          <Line
-            type="monotone"
-            dataKey="net_worth"
-            name="Net Worth"
-            stroke="var(--chart-net-worth)"
-            strokeWidth={3}
-            dot={false}
-            isAnimationActive={false}
-            activeDot={isScrubbing ? { r: 4, strokeWidth: 2, fill: "var(--background)" } : false}
-          />
+          {showNetWorth && (
+            <Line
+              type="monotone"
+              dataKey="net_worth"
+              name="Net Worth"
+              stroke="var(--chart-net-worth)"
+              strokeWidth={3}
+              dot={false}
+              isAnimationActive={false}
+              activeDot={isScrubbing ? { r: 4, strokeWidth: 2, fill: "var(--background)" } : false}
+            />
+          )}
           {activeClasses.map((cls) => (
             <Line
               key={cls.id}

@@ -11,6 +11,8 @@ import {
   type NetWorthByClassPoint,
 } from "@/lib/net-worth-range";
 
+const NET_WORTH_KEY = "net_worth";
+
 export function NetWorthHistory({
   initialPoints,
   initialDays,
@@ -20,18 +22,47 @@ export function NetWorthHistory({
 }) {
   const [days, setDays] = useState(initialDays);
   const [scrubPoint, setScrubPoint] = useState<NetWorthByClassPoint | null>(null);
+  // null means "everything visible" (the default); once the user toggles
+  // anything, this becomes the explicit set of visible line keys.
+  const [selectionOverride, setSelectionOverride] = useState<Set<string> | null>(null);
 
   const points = useMemo(
     () => sliceNetWorthPointsByDays(initialPoints, days),
     [initialPoints, days]
   );
 
+  const availableClasses = useMemo(
+    () => NET_WORTH_DISPLAY_CLASSES.filter((cls) => points.some((p) => Number(p[cls.id] ?? 0) !== 0)),
+    [points]
+  );
+  const allKeys = useMemo(
+    () => [NET_WORTH_KEY, ...availableClasses.map((c) => c.id)],
+    [availableClasses]
+  );
+  const selectedKeys = selectionOverride ?? new Set(allKeys);
+
+  function toggleKey(key: string) {
+    setSelectionOverride((prev) => {
+      const base = prev ?? new Set(allKeys);
+      const next = new Set(base);
+      if (next.has(key)) {
+        // Keep at least one line visible -- an empty chart gives no feedback.
+        if (next.size === 1) return base;
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }
+
   const latest = points[points.length - 1];
   const displayPoint = scrubPoint ?? latest;
   const legend = displayPoint
-    ? NET_WORTH_DISPLAY_CLASSES.filter((cls) => Number(displayPoint[cls.id] ?? 0) !== 0)
-        .map((cls) => ({ ...cls, value: Number(displayPoint[cls.id] ?? 0) }))
-        .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
+    ? [
+        { id: NET_WORTH_KEY, label: "Net Worth", colorVar: "--chart-net-worth", value: displayPoint.net_worth },
+        ...availableClasses.map((cls) => ({ ...cls, value: Number(displayPoint[cls.id] ?? 0) })),
+      ].sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
     : [];
 
   return (
@@ -52,7 +83,7 @@ export function NetWorthHistory({
           </button>
         ))}
       </div>
-      <NetWorthByClassChart points={points} onScrub={setScrubPoint} />
+      <NetWorthByClassChart points={points} onScrub={setScrubPoint} visibleKeys={selectedKeys} />
       {displayPoint && (
         <p className="text-xs text-zinc-500">
           {scrubPoint ? formatDate(scrubPoint.date) : `${formatDate(latest.date)} · latest`}
@@ -60,20 +91,43 @@ export function NetWorthHistory({
       )}
       {legend.length > 0 && (
         <ul className="flex flex-col divide-y divide-zinc-100 dark:divide-zinc-900">
-          {legend.map((cls) => (
-            <li key={cls.id} className="flex items-center justify-between py-2.5 text-sm">
-              <span className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: `var(${cls.colorVar})` }}
-                />
-                {cls.label}
-              </span>
-              <span className="font-medium text-zinc-900 dark:text-zinc-50">
-                {formatCurrency(cls.value)}
-              </span>
-            </li>
-          ))}
+          {legend.map((cls) => {
+            const isVisible = selectedKeys.has(cls.id);
+            return (
+              <li key={cls.id}>
+                <button
+                  type="button"
+                  onClick={() => toggleKey(cls.id)}
+                  aria-pressed={isVisible}
+                  className="flex w-full items-center justify-between py-2.5 text-sm"
+                >
+                  <span
+                    className={clsx(
+                      "flex items-center gap-2",
+                      isVisible ? "text-zinc-600 dark:text-zinc-400" : "text-zinc-300 dark:text-zinc-700"
+                    )}
+                  >
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full transition-opacity"
+                      style={{
+                        backgroundColor: `var(${cls.colorVar})`,
+                        opacity: isVisible ? 1 : 0.3,
+                      }}
+                    />
+                    {cls.label}
+                  </span>
+                  <span
+                    className={clsx(
+                      "font-medium",
+                      isVisible ? "text-zinc-900 dark:text-zinc-50" : "text-zinc-300 dark:text-zinc-700"
+                    )}
+                  >
+                    {formatCurrency(cls.value)}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
