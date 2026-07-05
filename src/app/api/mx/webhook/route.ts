@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
+import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 import { syncMxMember } from "@/lib/mx-sync";
 
 export async function POST(request: Request) {
@@ -26,6 +27,11 @@ export async function POST(request: Request) {
 
     if (user?.mx_user_guid && member) {
       await syncMxMember(db, user.mx_user_guid, member);
+      await invalidateCache(
+        CACHE_KEYS.transactionsDefault,
+        CACHE_KEYS.accountsList,
+        CACHE_KEYS.homeDashboard
+      );
     }
   }
 

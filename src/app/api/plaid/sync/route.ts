@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
+import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 import { syncPlaidItem } from "@/lib/sync";
 
 export async function POST() {
@@ -17,6 +18,12 @@ export async function POST() {
       results.push({ itemId: item.id, ok: false, error: (error as Error).message });
     }
   }
+
+  await invalidateCache(
+    CACHE_KEYS.transactionsDefault,
+    CACHE_KEYS.accountsList,
+    CACHE_KEYS.homeDashboard
+  );
 
   return NextResponse.json({ results });
 }

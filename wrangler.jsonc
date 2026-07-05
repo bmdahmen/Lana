@@ -15,6 +15,12 @@
       "database_id": "5fe8a2f4-9839-4eef-b9fc-6b90d014628e"
     }
   ],
+  "kv_namespaces": [
+    {
+      "binding": "CACHE",
+      "id": "7a42e984540447a8808be9dbe7cf315c"
+    }
+  ],
   "observability": {
     "enabled": true
   },
