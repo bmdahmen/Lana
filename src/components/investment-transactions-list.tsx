@@ -134,16 +134,16 @@ export function InvestmentTransactionsList({
                     {tx.security_name ?? tx.name}
                   </p>
                   <p className="truncate text-xs text-zinc-500">
-                    {typeLabel(tx.type, tx.subtype)} · {tx.account_name} · {formatDate(tx.date)}
+                    {typeLabel(tx.type, tx.subtype)} · {tx.account_name}
                   </p>
                 </div>
-                <span
-                  className="shrink-0 font-medium"
-                  style={color ? { color } : undefined}
-                >
-                  {sign}
-                  {formatCurrency(Math.abs(tx.amount))}
-                </span>
+                <div className="flex shrink-0 flex-col items-end">
+                  <span className="font-medium" style={color ? { color } : undefined}>
+                    {sign}
+                    {formatCurrency(Math.abs(tx.amount))}
+                  </span>
+                  <span className="text-xs text-zinc-500">{formatDate(tx.date)}</span>
+                </div>
               </li>
             );
           })}
