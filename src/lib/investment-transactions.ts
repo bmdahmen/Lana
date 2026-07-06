@@ -53,6 +53,57 @@ function normalizeAssetClasses(assetClasses?: string[]): string[] {
   return classes.length > 0 ? classes : [...INVESTMENT_ASSET_CLASSES];
 }
 
+/**
+ * A same-day "buy" of a settlement/money-market fund (Fidelity's automatic
+ * sweep being the common case) is often just Plaid's record of already-
+ * counted cash -- a contribution, deposit, dividend, or interest payout --
+ * landing in a fund, not new money on top of it. Pair each such buy off
+ * against a matching same-day cash amount in the group (in cents, to dodge
+ * float rounding) and drop it instead of double-counting it as a second
+ * contribution. Mirrors the same logic for sells against withdrawals.
+ */
+function netAccountDateFlows(
+  rows: Array<{ type: string; subtype: string; amount: number }>
+): { contributions: number; distributions: number } {
+  const buys: number[] = [];
+  const sells: number[] = [];
+  const cashIn: number[] = [];
+  const cashOut: number[] = [];
+  const cashNeutral: number[] = [];
+
+  for (const row of rows) {
+    const cents = Math.round(Math.abs(row.amount) * 100);
+    if (row.type === "buy" && (row.subtype === "buy" || row.subtype === "buy to cover")) {
+      buys.push(cents);
+    } else if (row.type === "sell" && (row.subtype === "sell" || row.subtype === "sell short")) {
+      sells.push(cents);
+    } else if (row.type === "cash") {
+      if (row.subtype === "contribution" || row.subtype === "deposit") cashIn.push(cents);
+      else if (row.subtype === "withdrawal" || row.subtype === "distribution") cashOut.push(cents);
+      else if (row.subtype === "dividend" || row.subtype === "interest") cashNeutral.push(cents);
+    }
+  }
+
+  const consume = (pool: number[], amounts: number[]): number[] => {
+    const remaining = [...pool];
+    for (const amount of amounts) {
+      const idx = remaining.indexOf(amount);
+      if (idx !== -1) remaining.splice(idx, 1);
+    }
+    return remaining;
+  };
+
+  const unmatchedBuys = consume(buys, [...cashIn, ...cashNeutral]);
+  const unmatchedSells = consume(sells, cashOut);
+
+  const sum = (values: number[]) => values.reduce((a, b) => a + b, 0) / 100;
+
+  return {
+    contributions: sum(cashIn) + sum(unmatchedBuys),
+    distributions: sum(cashOut) + sum(unmatchedSells),
+  };
+}
+
 export async function getInvestmentBreakdown(
   db: D1Database,
   opts: { from?: string; to?: string; assetClasses?: string[] }
@@ -71,31 +122,56 @@ export async function getInvestmentBreakdown(
 
   const result = await db
     .prepare(
-      `SELECT a.id as account_id, a.name as account_name, a.asset_class, it.type, it.subtype, it.amount
+      `SELECT a.id as account_id, a.name as account_name, a.asset_class, it.date, it.type, it.subtype, it.amount
        FROM investment_transaction it
        JOIN account a ON a.id = it.account_id
        WHERE ${conditions.join(" AND ")}`
     )
     .bind(...bindings)
-    .all<{ account_id: string; account_name: string; asset_class: AssetClass; type: string; subtype: string; amount: number }>();
+    .all<{
+      account_id: string;
+      account_name: string;
+      asset_class: AssetClass;
+      date: string;
+      type: string;
+      subtype: string;
+      amount: number;
+    }>();
+
+  const accountMeta = new Map<string, { account_name: string; asset_class: AssetClass }>();
+  const groups = new Map<string, Array<{ type: string; subtype: string; amount: number }>>();
+  const counts = new Map<string, number>();
+  for (const row of result.results ?? []) {
+    if (classifyInvestmentFlow(row.type, row.subtype)) {
+      counts.set(row.account_id, (counts.get(row.account_id) ?? 0) + 1);
+    }
+    accountMeta.set(row.account_id, { account_name: row.account_name, asset_class: row.asset_class });
+    const key = `${row.account_id}|${row.date}`;
+    const group = groups.get(key) ?? [];
+    group.push({ type: row.type, subtype: row.subtype, amount: row.amount });
+    groups.set(key, group);
+  }
 
   const byAccount = new Map<string, InvestmentBreakdownRow>();
-  for (const row of result.results ?? []) {
-    const flow = classifyInvestmentFlow(row.type, row.subtype);
-    if (!flow) continue;
+  for (const [key, group] of groups) {
+    const accountId = key.slice(0, key.lastIndexOf("|"));
+    const meta = accountMeta.get(accountId)!;
+    const flows = netAccountDateFlows(group);
 
-    const existing = byAccount.get(row.account_id) ?? {
-      account_id: row.account_id,
-      account_name: row.account_name,
-      asset_class: row.asset_class,
+    const existing = byAccount.get(accountId) ?? {
+      account_id: accountId,
+      account_name: meta.account_name,
+      asset_class: meta.asset_class,
       contributions: 0,
       distributions: 0,
       count: 0,
     };
-    if (flow === "contribution") existing.contributions += Math.abs(row.amount);
-    else existing.distributions += Math.abs(row.amount);
-    existing.count += 1;
-    byAccount.set(row.account_id, existing);
+    existing.contributions += flows.contributions;
+    existing.distributions += flows.distributions;
+    byAccount.set(accountId, existing);
+  }
+  for (const [accountId, row] of byAccount) {
+    row.count = counts.get(accountId) ?? 0;
   }
 
   return [...byAccount.values()].sort((a, b) => b.contributions - a.contributions);

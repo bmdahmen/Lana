@@ -165,8 +165,57 @@ export async function syncInvestmentTransactions(db: D1Database, item: PlaidItem
     return;
   }
 
-  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const chunk = rows.slice(i, i + BATCH_SIZE);
+  // Some institutions (seen on small retirement/HSA aggregators) hand back a
+  // fresh investment_transaction_id for a real-world transaction we already
+  // stored under a different one, which our INSERT ... ON CONFLICT can't
+  // catch since it only dedupes by that id. Catch it here instead, keyed on
+  // the transaction's actual content.
+  const contentKey = (row: { accountId: string; date: string; name: string; amount: number; type: string; subtype: string }) =>
+    `${row.accountId}|${row.date}|${row.name}|${row.amount}|${row.type}|${row.subtype}`;
+
+  const accountIds = [...accountByPlaidId.values()];
+  const existing = await db
+    .prepare(
+      `SELECT plaid_investment_transaction_id, account_id, date, name, amount, type, subtype
+       FROM investment_transaction WHERE account_id IN (${accountIds.map(() => "?").join(",")})`
+    )
+    .bind(...accountIds)
+    .all<{
+      plaid_investment_transaction_id: string;
+      account_id: string;
+      date: string;
+      name: string;
+      amount: number;
+      type: string;
+      subtype: string;
+    }>();
+
+  const knownPlaidIdForContent = new Map<string, string>();
+  for (const row of existing.results ?? []) {
+    knownPlaidIdForContent.set(
+      contentKey({
+        accountId: row.account_id,
+        date: row.date,
+        name: row.name,
+        amount: row.amount,
+        type: row.type,
+        subtype: row.subtype,
+      }),
+      row.plaid_investment_transaction_id
+    );
+  }
+
+  const dedupedRows: typeof rows = [];
+  for (const row of rows) {
+    const key = contentKey(row);
+    const knownPlaidId = knownPlaidIdForContent.get(key);
+    if (knownPlaidId && knownPlaidId !== row.plaidId) continue;
+    knownPlaidIdForContent.set(key, row.plaidId);
+    dedupedRows.push(row);
+  }
+
+  for (let i = 0; i < dedupedRows.length; i += BATCH_SIZE) {
+    const chunk = dedupedRows.slice(i, i + BATCH_SIZE);
     await db.batch(
       chunk.map((row) =>
         db
