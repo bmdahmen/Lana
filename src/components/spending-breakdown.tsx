@@ -6,6 +6,7 @@ import { TransactionsTable } from "@/components/transactions-table";
 import { buildMonthOptions } from "@/lib/month-range";
 
 const MONTHS_BACK = 12;
+const NON_SPENDING_CATEGORY_IDS = ["cat_income", "cat_transfer"];
 
 interface BreakdownRow {
   category_id: string;
@@ -156,6 +157,7 @@ export function SpendingBreakdown({
           key={`${from}:${to}`}
           categories={categories}
           fixedCategoryId={activeCategory?.category_id}
+          excludeCategoryIds={NON_SPENDING_CATEGORY_IDS}
           from={from}
           to={to}
           defaultSort="amount"

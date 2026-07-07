@@ -39,6 +39,7 @@ interface RuleDraft {
 export function TransactionsTable({
   categories,
   fixedCategoryId,
+  excludeCategoryIds,
   from,
   to,
   defaultSort = "recent",
@@ -49,6 +50,8 @@ export function TransactionsTable({
   /** When set, results are locked to this category. Reactive: changing it (e.g. from a
    *  clickable category tile above this table) re-filters the list. */
   fixedCategoryId?: string;
+  /** Category ids to always leave out (e.g. transfers, income) regardless of any other filter. */
+  excludeCategoryIds?: string[];
   /** Optional fixed date range (inclusive), e.g. when embedded for a single month. */
   from?: string;
   to?: string;
@@ -76,12 +79,17 @@ export function TransactionsTable({
   const [ruleMessage, setRuleMessage] = useState<string | null>(null);
   // Which mobile row's swipe-revealed category editor is expanded, if any.
   const [categoryEditId, setCategoryEditId] = useState<string | null>(null);
+  // A stable primitive key instead of the array itself, since callers often pass
+  // a fresh array literal on every render -- that would otherwise bust the
+  // useCallback deps below on every parent re-render.
+  const excludeCategoryKey = excludeCategoryIds?.join(",") ?? "";
 
   const buildParams = useCallback(
     (offset: number) => {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
       if (categoryFilter) params.set("categoryId", categoryFilter);
+      if (excludeCategoryKey) params.set("excludeCategories", excludeCategoryKey);
       if (from) params.set("from", from);
       if (to) params.set("to", to);
       if (sortMode !== "recent") params.set("sort", sortMode);
@@ -89,11 +97,12 @@ export function TransactionsTable({
       params.set("offset", String(offset));
       return params;
     },
-    [search, categoryFilter, from, to, sortMode]
+    [search, categoryFilter, excludeCategoryKey, from, to, sortMode]
   );
 
   const load = useCallback(async () => {
-    const isDefaultView = !search && !categoryFilter && !from && !to && sortMode === "recent";
+    const isDefaultView =
+      !search && !categoryFilter && !excludeCategoryKey && !from && !to && sortMode === "recent";
 
     if (isDefaultView) {
       const cached = getCachedFetch<Transaction[]>(DEFAULT_TRANSACTIONS_CACHE_KEY);
@@ -118,7 +127,7 @@ export function TransactionsTable({
     } finally {
       setLoading(false);
     }
-  }, [search, categoryFilter, from, to, sortMode, buildParams]);
+  }, [search, categoryFilter, excludeCategoryKey, from, to, sortMode, buildParams]);
 
   useEffect(() => {
     const timeout = setTimeout(load, 250);
