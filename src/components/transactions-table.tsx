@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { getCachedFetch, setCachedFetch, invalidateCachedFetch } from "@/lib/client-cache";
 
@@ -19,11 +19,13 @@ interface Transaction {
   merchant_name: string | null;
   amount: number;
   date: string;
+  authorized_date: string | null;
   pending: number;
   account_name: string;
   category_id: string | null;
   category_name: string | null;
   category_icon: string | null;
+  category_source: string;
 }
 
 interface RuleDraft {
@@ -79,6 +81,8 @@ export function TransactionsTable({
   const [ruleMessage, setRuleMessage] = useState<string | null>(null);
   // Which mobile row's swipe-revealed category editor is expanded, if any.
   const [categoryEditId, setCategoryEditId] = useState<string | null>(null);
+  // Which row's inline detail expansion is open, if any.
+  const [detailId, setDetailId] = useState<string | null>(null);
   // A stable primitive key instead of the array itself, since callers often pass
   // a fresh array literal on every render -- that would otherwise bust the
   // useCallback deps below on every parent re-render.
@@ -383,7 +387,11 @@ export function TransactionsTable({
                 className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950"
               >
                 <div className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto">
-                  <div className="flex w-full shrink-0 snap-start items-start gap-2.5 px-3 py-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setDetailId(detailId === tx.id ? null : tx.id)}
+                    className="flex w-full shrink-0 snap-start items-start gap-2.5 px-3 py-2.5 text-left"
+                  >
                     <span className="mt-0.5 shrink-0 text-lg leading-none" aria-hidden>
                       {tx.category_icon ?? "❔"}
                     </span>
@@ -397,6 +405,9 @@ export function TransactionsTable({
                             </span>
                           )}
                         </p>
+                        {tx.merchant_name && tx.merchant_name !== tx.name && (
+                          <p className="truncate text-xs text-zinc-400 dark:text-zinc-600">{tx.name}</p>
+                        )}
                         <p className="text-xs text-zinc-500">
                           {tx.account_name} · {formatDate(tx.date)}
                         </p>
@@ -409,7 +420,7 @@ export function TransactionsTable({
                         {formatCurrency(Math.abs(tx.amount))}
                       </span>
                     </div>
-                  </div>
+                  </button>
                   <div className="flex shrink-0 snap-end items-center gap-1 border-l border-zinc-100 px-3 dark:border-zinc-900">
                     <button
                       type="button"
@@ -463,6 +474,11 @@ export function TransactionsTable({
                     <RuleDraftForm />
                   </div>
                 )}
+                {detailId === tx.id && (
+                  <div className="border-t border-zinc-100 px-3 py-2 dark:border-zinc-900">
+                    <TransactionDetailRows tx={tx} />
+                  </div>
+                )}
               </li>
             ))}
           </ul>
@@ -482,11 +498,17 @@ export function TransactionsTable({
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-900">
                 {transactions.map((tx) => (
                   <Fragment key={tx.id}>
-                    <tr>
-                      <td className="whitespace-nowrap px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                    <tr className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900/50">
+                      <td
+                        onClick={() => setDetailId(detailId === tx.id ? null : tx.id)}
+                        className="whitespace-nowrap px-4 py-3 text-zinc-600 dark:text-zinc-400"
+                      >
                         {formatDate(tx.date)}
                       </td>
-                      <td className="px-4 py-3">
+                      <td
+                        onClick={() => setDetailId(detailId === tx.id ? null : tx.id)}
+                        className="px-4 py-3"
+                      >
                         <span className="font-medium text-zinc-900 dark:text-zinc-50">
                           {tx.merchant_name ?? tx.name}
                         </span>
@@ -495,11 +517,17 @@ export function TransactionsTable({
                             Pending
                           </span>
                         )}
+                        {tx.merchant_name && tx.merchant_name !== tx.name && (
+                          <p className="truncate text-xs text-zinc-400 dark:text-zinc-600">{tx.name}</p>
+                        )}
                       </td>
-                      <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                      <td
+                        onClick={() => setDetailId(detailId === tx.id ? null : tx.id)}
+                        className="px-4 py-3 text-zinc-600 dark:text-zinc-400"
+                      >
                         {tx.account_name}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="cursor-auto px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">
                           <select
                             value={tx.category_id ?? ""}
@@ -522,7 +550,10 @@ export function TransactionsTable({
                           </button>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right font-medium text-zinc-900 dark:text-zinc-50">
+                      <td
+                        onClick={() => setDetailId(detailId === tx.id ? null : tx.id)}
+                        className="px-4 py-3 text-right font-medium text-zinc-900 dark:text-zinc-50"
+                      >
                         {tx.amount > 0 ? "-" : "+"}
                         {formatCurrency(Math.abs(tx.amount))}
                       </td>
@@ -531,6 +562,13 @@ export function TransactionsTable({
                       <tr>
                         <td colSpan={5} className="bg-zinc-50 px-4 py-3 dark:bg-zinc-900">
                           <RuleDraftForm />
+                        </td>
+                      </tr>
+                    )}
+                    {detailId === tx.id && (
+                      <tr>
+                        <td colSpan={5} className="bg-zinc-50 px-4 py-3 dark:bg-zinc-900">
+                          <TransactionDetailRows tx={tx} />
                         </td>
                       </tr>
                     )}
@@ -551,6 +589,36 @@ export function TransactionsTable({
           {loadingMore ? "Loading..." : "Load more"}
         </button>
       )}
+
+    </div>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: ReactNode }) {
+  if (value === null || value === undefined || value === "") return null;
+  return (
+    <div className="flex items-start justify-between gap-4 py-1.5 text-xs">
+      <span className="shrink-0 text-zinc-500">{label}</span>
+      <span className="text-right text-zinc-900 dark:text-zinc-50">{value}</span>
+    </div>
+  );
+}
+
+function TransactionDetailRows({ tx }: { tx: Transaction }) {
+  return (
+    <div className="divide-y divide-zinc-100 dark:divide-zinc-900">
+      <DetailRow
+        label="Authorized date"
+        value={tx.authorized_date ? formatDate(tx.authorized_date) : null}
+      />
+      <DetailRow label="Status" value={tx.pending === 1 ? "Pending" : "Posted"} />
+      <DetailRow
+        label="Category"
+        value={
+          tx.category_name ? `${tx.category_icon ?? ""} ${tx.category_name}`.trim() : "Uncategorized"
+        }
+      />
+      <DetailRow label="Category source" value={tx.category_source} />
     </div>
   );
 }
