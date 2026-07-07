@@ -397,7 +397,7 @@ export function TransactionsTable({
                     </span>
                     <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
                           {tx.merchant_name ?? tx.name}
                           {tx.pending === 1 && (
                             <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-normal text-zinc-500 dark:bg-zinc-800">
@@ -406,7 +406,7 @@ export function TransactionsTable({
                           )}
                         </p>
                         {tx.merchant_name && tx.merchant_name !== tx.name && (
-                          <p className="truncate text-xs text-zinc-400 dark:text-zinc-600">{tx.name}</p>
+                          <p className="text-xs text-zinc-400 dark:text-zinc-600">{tx.name}</p>
                         )}
                         <p className="text-xs text-zinc-500">
                           {tx.account_name} · {formatDate(tx.date)}
@@ -518,7 +518,7 @@ export function TransactionsTable({
                           </span>
                         )}
                         {tx.merchant_name && tx.merchant_name !== tx.name && (
-                          <p className="truncate text-xs text-zinc-400 dark:text-zinc-600">{tx.name}</p>
+                          <p className="text-xs text-zinc-400 dark:text-zinc-600">{tx.name}</p>
                         )}
                       </td>
                       <td
