@@ -39,7 +39,31 @@ export function NetWorthHistory({
     () => [NET_WORTH_KEY, ...availableClasses.map((c) => c.id)],
     [availableClasses]
   );
-  const selectedKeys = selectionOverride ?? new Set(allKeys);
+  const selectedKeys = useMemo(
+    () => selectionOverride ?? new Set(allKeys),
+    [selectionOverride, allKeys]
+  );
+
+  // Whether the user has deselected at least one asset class (as opposed to
+  // just toggling the total line itself) -- this is what flips the summary
+  // row from the true Net Worth to a Net Combined of only what's selected.
+  const isFiltered = availableClasses.some((cls) => !selectedKeys.has(cls.id));
+  const totalLabel = isFiltered ? "Net Combined" : "Net Worth";
+
+  // The chart reads its total line from each point's `net_worth` field, so
+  // when filtered we swap that field for the sum of only the selected
+  // classes -- everything downstream (scrub, latest, legend) then just works
+  // off this series without needing to special-case the combined value.
+  const chartPoints = useMemo<NetWorthByClassPoint[]>(() => {
+    if (!isFiltered) return points;
+    return points.map((p): NetWorthByClassPoint => {
+      let combined = 0;
+      for (const cls of availableClasses) {
+        if (selectedKeys.has(cls.id)) combined += Number(p[cls.id] ?? 0);
+      }
+      return { ...p, net_worth: combined };
+    });
+  }, [points, isFiltered, availableClasses, selectedKeys]);
 
   function toggleKey(key: string) {
     setSelectionOverride((prev) => {
@@ -56,11 +80,11 @@ export function NetWorthHistory({
     });
   }
 
-  const latest = points[points.length - 1];
+  const latest = chartPoints[chartPoints.length - 1];
   const displayPoint = scrubPoint ?? latest;
   const legend = displayPoint
     ? [
-        { id: NET_WORTH_KEY, label: "Net Worth", colorVar: "--chart-net-worth", value: displayPoint.net_worth },
+        { id: NET_WORTH_KEY, label: totalLabel, colorVar: "--chart-net-worth", value: displayPoint.net_worth },
         ...availableClasses.map((cls) => ({ ...cls, value: Number(displayPoint[cls.id] ?? 0) })),
       ].sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
     : [];
@@ -83,7 +107,12 @@ export function NetWorthHistory({
           </button>
         ))}
       </div>
-      <NetWorthByClassChart points={points} onScrub={setScrubPoint} visibleKeys={selectedKeys} />
+      <NetWorthByClassChart
+        points={chartPoints}
+        onScrub={setScrubPoint}
+        visibleKeys={selectedKeys}
+        totalLabel={totalLabel}
+      />
       {displayPoint && (
         <p className="text-xs text-zinc-500">
           {scrubPoint ? formatDate(scrubPoint.date) : `${formatDate(latest.date)} · latest`}

@@ -52,6 +52,7 @@ export function NetWorthByClassChart({
   points,
   onScrub,
   visibleKeys,
+  totalLabel = "Net Worth",
 }: {
   points: NetWorthByClassPoint[];
   onScrub?: (point: NetWorthByClassPoint | null) => void;
@@ -60,6 +61,9 @@ export function NetWorthByClassChart({
    *  the Y axis rescales automatically to whatever lines are actually
    *  rendered, so hiding a line here is enough to shrink/grow the axis. */
   visibleKeys?: Set<string>;
+  /** Label for the `net_worth` line -- callers swap this to "Net Combined"
+   *  when the field holds a partial sum instead of the true net worth. */
+  totalLabel?: string;
 }) {
   const suppressMouseUntilRef = useRef(0);
   // Tracks hover/scrub state ourselves rather than trusting recharts' own
@@ -136,7 +140,7 @@ export function NetWorthByClassChart({
             <Line
               type="monotone"
               dataKey="net_worth"
-              name="Net Worth"
+              name={totalLabel}
               stroke="var(--chart-net-worth)"
               strokeWidth={3}
               dot={false}
