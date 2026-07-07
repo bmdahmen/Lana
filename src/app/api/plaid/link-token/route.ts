@@ -52,6 +52,10 @@ export async function POST(request: Request) {
     // institutions that support it -- Transactions stays the only required
     // product, so plain bank accounts can still link normally.
     additional_consented_products: [Products.Investments],
+    // Without this, Plaid only backfills ~90 days of transaction history on
+    // initial Link. 730 is the max Plaid allows; actual depth still depends
+    // on what the institution itself retains.
+    transactions: { days_requested: 730 },
     country_codes: [CountryCode.Us],
     language: "en",
     webhook: process.env.PLAID_WEBHOOK_URL,
