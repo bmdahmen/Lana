@@ -53,23 +53,32 @@ function normalizeAssetClasses(assetClasses?: string[]): string[] {
   return classes.length > 0 ? classes : [...INVESTMENT_ASSET_CLASSES];
 }
 
+interface DatedAmount {
+  date: string;
+  cents: number;
+}
+
 /**
- * A same-day "buy" of a settlement/money-market fund (Fidelity's automatic
- * sweep being the common case) is often just Plaid's record of already-
+ * Same-day "buys" of a settlement/money-market fund (Fidelity's automatic
+ * sweep being the common case) are often just Plaid's record of already-
  * counted cash -- a contribution, deposit, dividend, or interest payout --
- * landing in a fund, not new money on top of it. Pair each such buy off
- * against a matching same-day cash amount in the group (in cents, to dodge
- * float rounding) and drop it instead of double-counting it as a second
- * contribution. Mirrors the same logic for sells against withdrawals.
+ * landing in a fund, not new money on top of it. When a day's total buys are
+ * fully covered by that day's cash-in (which may span several contribution
+ * rows swept into one combined buy, e.g. an employer + employee HSA
+ * contribution on the same day), drop the buys instead of double-counting
+ * them as a second contribution. Mirrors the same logic for sells against
+ * withdrawals. Buys/sells that aren't fully covered are returned (with their
+ * date) for a second, account-wide pass that nets out fund exchanges.
  */
-function netAccountDateFlows(
+function splitDateGroup(
+  date: string,
   rows: Array<{ type: string; subtype: string; amount: number }>
-): { contributions: number; distributions: number } {
+): { cashIn: number; cashOut: number; unmatchedBuys: DatedAmount[]; unmatchedSells: DatedAmount[] } {
   const buys: number[] = [];
   const sells: number[] = [];
-  const cashIn: number[] = [];
-  const cashOut: number[] = [];
-  const cashNeutral: number[] = [];
+  let cashIn = 0;
+  let cashOut = 0;
+  let cashNeutral = 0;
 
   for (const row of rows) {
     const cents = Math.round(Math.abs(row.amount) * 100);
@@ -78,29 +87,94 @@ function netAccountDateFlows(
     } else if (row.type === "sell" && (row.subtype === "sell" || row.subtype === "sell short")) {
       sells.push(cents);
     } else if (row.type === "cash") {
-      if (row.subtype === "contribution" || row.subtype === "deposit") cashIn.push(cents);
-      else if (row.subtype === "withdrawal" || row.subtype === "distribution") cashOut.push(cents);
-      else if (row.subtype === "dividend" || row.subtype === "interest") cashNeutral.push(cents);
+      if (row.subtype === "contribution" || row.subtype === "deposit") cashIn += cents;
+      else if (row.subtype === "withdrawal" || row.subtype === "distribution") cashOut += cents;
+      else if (row.subtype === "dividend" || row.subtype === "interest") cashNeutral += cents;
     }
   }
 
-  const consume = (pool: number[], amounts: number[]): number[] => {
-    const remaining = [...pool];
-    for (const amount of amounts) {
-      const idx = remaining.indexOf(amount);
-      if (idx !== -1) remaining.splice(idx, 1);
-    }
-    return remaining;
-  };
-
-  const unmatchedBuys = consume(buys, [...cashIn, ...cashNeutral]);
-  const unmatchedSells = consume(sells, cashOut);
-
-  const sum = (values: number[]) => values.reduce((a, b) => a + b, 0) / 100;
+  const buysTotal = buys.reduce((a, b) => a + b, 0);
+  const sellsTotal = sells.reduce((a, b) => a + b, 0);
+  const buysAreSwept = buysTotal > 0 && buysTotal <= cashIn + cashNeutral;
+  const sellsAreSwept = sellsTotal > 0 && sellsTotal <= cashOut;
 
   return {
-    contributions: sum(cashIn) + sum(unmatchedBuys),
-    distributions: sum(cashOut) + sum(unmatchedSells),
+    cashIn,
+    cashOut,
+    unmatchedBuys: buysAreSwept ? [] : buys.map((cents) => ({ date, cents })),
+    unmatchedSells: sellsAreSwept ? [] : sells.map((cents) => ({ date, cents })),
+  };
+}
+
+const EXCHANGE_WINDOW_DAYS = 5;
+
+function daysBetween(a: string, b: string): number {
+  return Math.abs(Date.parse(a) - Date.parse(b)) / 86_400_000;
+}
+
+/**
+ * A buy and a sell of the exact same dollar amount within a few days of
+ * each other, anywhere in the account, is a fund exchange (e.g. redeeming a
+ * money-market sweep fund to buy an ETF) -- money moving between holdings
+ * inside the account, not new money contributed or withdrawn. The sell leg
+ * can settle a day or two before the matching buy posts, so this isn't
+ * limited to same-day pairs the way the cash-vs-buy/sell matching above is.
+ */
+function netExchanges(
+  buys: DatedAmount[],
+  sells: DatedAmount[]
+): { unmatchedBuys: DatedAmount[]; unmatchedSells: DatedAmount[] } {
+  const remainingSells = [...sells];
+  const unmatchedBuys: DatedAmount[] = [];
+
+  for (const buy of buys) {
+    let bestIdx = -1;
+    let bestDiff = Infinity;
+    for (let i = 0; i < remainingSells.length; i++) {
+      const sell = remainingSells[i];
+      if (sell.cents !== buy.cents) continue;
+      const diff = daysBetween(buy.date, sell.date);
+      if (diff <= EXCHANGE_WINDOW_DAYS && diff < bestDiff) {
+        bestDiff = diff;
+        bestIdx = i;
+      }
+    }
+    if (bestIdx !== -1) remainingSells.splice(bestIdx, 1);
+    else unmatchedBuys.push(buy);
+  }
+
+  return { unmatchedBuys, unmatchedSells: remainingSells };
+}
+
+function netAccountFlows(
+  rows: Array<{ date: string; type: string; subtype: string; amount: number }>
+): { contributions: number; distributions: number } {
+  const byDate = new Map<string, Array<{ type: string; subtype: string; amount: number }>>();
+  for (const row of rows) {
+    const group = byDate.get(row.date) ?? [];
+    group.push(row);
+    byDate.set(row.date, group);
+  }
+
+  let cashIn = 0;
+  let cashOut = 0;
+  let unmatchedBuys: DatedAmount[] = [];
+  let unmatchedSells: DatedAmount[] = [];
+  for (const [date, group] of byDate) {
+    const r = splitDateGroup(date, group);
+    cashIn += r.cashIn;
+    cashOut += r.cashOut;
+    unmatchedBuys = unmatchedBuys.concat(r.unmatchedBuys);
+    unmatchedSells = unmatchedSells.concat(r.unmatchedSells);
+  }
+
+  const { unmatchedBuys: finalBuys, unmatchedSells: finalSells } = netExchanges(unmatchedBuys, unmatchedSells);
+
+  const sum = (values: DatedAmount[]) => values.reduce((a, b) => a + b.cents, 0) / 100;
+
+  return {
+    contributions: cashIn / 100 + sum(finalBuys),
+    distributions: cashOut / 100 + sum(finalSells),
   };
 }
 
@@ -139,39 +213,30 @@ export async function getInvestmentBreakdown(
     }>();
 
   const accountMeta = new Map<string, { account_name: string; asset_class: AssetClass }>();
-  const groups = new Map<string, Array<{ type: string; subtype: string; amount: number }>>();
+  const rowsByAccount = new Map<string, Array<{ date: string; type: string; subtype: string; amount: number }>>();
   const counts = new Map<string, number>();
   for (const row of result.results ?? []) {
     if (classifyInvestmentFlow(row.type, row.subtype)) {
       counts.set(row.account_id, (counts.get(row.account_id) ?? 0) + 1);
     }
     accountMeta.set(row.account_id, { account_name: row.account_name, asset_class: row.asset_class });
-    const key = `${row.account_id}|${row.date}`;
-    const group = groups.get(key) ?? [];
-    group.push({ type: row.type, subtype: row.subtype, amount: row.amount });
-    groups.set(key, group);
+    const list = rowsByAccount.get(row.account_id) ?? [];
+    list.push({ date: row.date, type: row.type, subtype: row.subtype, amount: row.amount });
+    rowsByAccount.set(row.account_id, list);
   }
 
   const byAccount = new Map<string, InvestmentBreakdownRow>();
-  for (const [key, group] of groups) {
-    const accountId = key.slice(0, key.lastIndexOf("|"));
+  for (const [accountId, rows] of rowsByAccount) {
     const meta = accountMeta.get(accountId)!;
-    const flows = netAccountDateFlows(group);
-
-    const existing = byAccount.get(accountId) ?? {
+    const flows = netAccountFlows(rows);
+    byAccount.set(accountId, {
       account_id: accountId,
       account_name: meta.account_name,
       asset_class: meta.asset_class,
-      contributions: 0,
-      distributions: 0,
-      count: 0,
-    };
-    existing.contributions += flows.contributions;
-    existing.distributions += flows.distributions;
-    byAccount.set(accountId, existing);
-  }
-  for (const [accountId, row] of byAccount) {
-    row.count = counts.get(accountId) ?? 0;
+      contributions: flows.contributions,
+      distributions: flows.distributions,
+      count: counts.get(accountId) ?? 0,
+    });
   }
 
   return [...byAccount.values()].sort((a, b) => b.contributions - a.contributions);
