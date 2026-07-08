@@ -486,10 +486,7 @@ function SeriesList({
                 <ul className="divide-y divide-zinc-50 border-t border-zinc-100 dark:divide-zinc-900 dark:border-zinc-900">
                   {s.items.map((item) => (
                     <li key={item.id}>
-                      <div
-                        onClick={() => toggleQuickEdit(item.id)}
-                        className="flex cursor-pointer items-center justify-between gap-3 py-2 pr-4 pl-9 hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
-                      >
+                      <div className="flex items-center justify-between gap-3 py-2 pr-4 pl-9 hover:bg-zinc-50 dark:hover:bg-zinc-900/50">
                         <div className="min-w-0">
                           <p className="truncate text-sm text-zinc-700 dark:text-zinc-300">
                             {item.year ? `${item.year}` : "Undated"}
@@ -499,7 +496,7 @@ function SeriesList({
                             {itemSubline(item, { includeCondition: false })}
                           </p>
                         </div>
-                        <div className="flex shrink-0 items-center gap-3">
+                        <div className="flex shrink-0 items-center gap-2.5">
                           <div className="text-right">
                             <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
                               {formatCurrency(itemValue(item, spotPrices))}
@@ -510,13 +507,25 @@ function SeriesList({
                           </div>
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteItem(item);
-                            }}
-                            className="text-xs font-medium text-red-500 hover:text-red-700"
+                            onClick={() => toggleQuickEdit(item.id)}
+                            aria-label="Edit quantity"
+                            aria-pressed={quickEditingId === item.id}
+                            className={clsx(
+                              "flex h-8 w-8 shrink-0 items-center justify-center rounded-md border transition-colors",
+                              quickEditingId === item.id
+                                ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-50 dark:bg-zinc-50 dark:text-zinc-900"
+                                : "border-zinc-300 text-zinc-500 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                            )}
                           >
-                            Delete
+                            <EditIcon />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteItem(item)}
+                            aria-label="Delete item"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-zinc-300 text-red-500 hover:bg-red-50 dark:border-zinc-700 dark:hover:bg-red-950/40"
+                          >
+                            <DeleteIcon />
                           </button>
                         </div>
                       </div>
@@ -561,4 +570,25 @@ function itemSubline(item: MetalItem, options?: { includeCondition?: boolean }):
     );
   }
   return parts.join(" · ") || "—";
+}
+
+function EditIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+
+function DeleteIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+    </svg>
+  );
 }
