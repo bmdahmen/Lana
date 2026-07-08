@@ -31,7 +31,6 @@ const createSchema = z
       "retirement",
       "crypto",
       "real_estate",
-      "hard_asset",
       "precious_metals",
       "liabilities",
       "other",

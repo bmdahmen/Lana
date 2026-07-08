@@ -4,7 +4,6 @@ export type AssetClass =
   | "retirement"
   | "crypto"
   | "real_estate"
-  | "hard_asset"
   | "precious_metals"
   | "liabilities"
   | "other";
@@ -15,7 +14,6 @@ export const ASSET_CLASSES: { id: AssetClass; label: string; colorVar: string; i
   { id: "retirement", label: "Retirement", colorVar: "--chart-retirement", icon: "🏦" },
   { id: "crypto", label: "Crypto", colorVar: "--chart-crypto", icon: "🪙" },
   { id: "real_estate", label: "Real Estate", colorVar: "--chart-real-estate", icon: "🏠" },
-  { id: "hard_asset", label: "Hard Assets", colorVar: "--chart-hard-asset", icon: "💎" },
   { id: "precious_metals", label: "Precious Metals", colorVar: "--chart-precious-metals", icon: "🥇" },
   { id: "liabilities", label: "Liabilities", colorVar: "--chart-liabilities", icon: "💳" },
   { id: "other", label: "Other", colorVar: "--chart-other", icon: "📦" },

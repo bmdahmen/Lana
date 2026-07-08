@@ -24,7 +24,6 @@ const updateSchema = z.object({
       "retirement",
       "crypto",
       "real_estate",
-      "hard_asset",
       "precious_metals",
       "liabilities",
       "other",
