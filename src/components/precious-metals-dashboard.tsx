@@ -129,7 +129,7 @@ function MetalSummaryCard({ metal, summary }: { metal: PreciousMetal; summary: M
             <li key={c.category}>
               <div className="mb-1 flex items-center justify-between text-xs">
                 <span className="text-zinc-600 dark:text-zinc-400">
-                  {categoryLabel(c.category)} · {c.itemCount}
+                  {categoryLabel(c.category)} · {formatTroyOz(c.troyOz)}
                 </span>
                 <span className="font-medium text-zinc-900 dark:text-zinc-50">{formatCurrency(c.value)}</span>
               </div>
