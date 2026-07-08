@@ -11,8 +11,7 @@ import {
   type MetalItemCategory,
 } from "@/lib/metal-items";
 import { PRECIOUS_METALS, type PreciousMetal } from "@/lib/asset-classes";
-import { EditMetalItemModal, QuickEditQuantityModal } from "@/components/metal-item-modal";
-import { SwipeableRow } from "@/components/swipeable-row";
+import { EditMetalItemModal, QuickEditQuantityFields } from "@/components/metal-item-modal";
 import { useRouter } from "next/navigation";
 
 interface SeriesGroup {
@@ -176,7 +175,9 @@ export function MetalItemsList({
   const [items, setItems] = useState(initialItems);
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState<MetalItem | null>(null);
-  const [quickEditing, setQuickEditing] = useState<MetalItem | null>(null);
+  // The single lot row currently expanded for quick quantity editing, if any
+  // -- same one-open-at-a-time, expand-in-place pattern as the Rules tab.
+  const [quickEditingId, setQuickEditingId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const router = useRouter();
 
@@ -216,8 +217,13 @@ export function MetalItemsList({
     });
   }
 
+  function toggleQuickEdit(id: string) {
+    setQuickEditingId((prev) => (prev === id ? null : id));
+  }
+
   async function deleteItem(item: MetalItem) {
     if (!confirm(`Remove ${item.year ? `${item.year} ` : ""}${item.name} from the collection?`)) return;
+    if (quickEditingId === item.id) setQuickEditingId(null);
     const res = await fetch(`/api/metal-items/${item.id}`, { method: "DELETE" });
     if (!res.ok) {
       const data = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -228,13 +234,13 @@ export function MetalItemsList({
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex gap-2 overflow-x-auto pb-1">
+    <div className="flex flex-col gap-2">
+      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
         <button
           type="button"
           onClick={() => onMetalFilterChange(null)}
           className={clsx(
-            "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+            "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors",
             metalFilter === null
               ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900"
               : "border border-zinc-300 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900"
@@ -248,7 +254,7 @@ export function MetalItemsList({
             type="button"
             onClick={() => onMetalFilterChange(metalFilter === m ? null : m)}
             className={clsx(
-              "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+              "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors",
               metalFilter === m
                 ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900"
                 : "border border-zinc-300 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900"
@@ -259,12 +265,12 @@ export function MetalItemsList({
         ))}
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
         <button
           type="button"
           onClick={() => onCategoryFilterChange(null)}
           className={clsx(
-            "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+            "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors",
             categoryFilter === null
               ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900"
               : "border border-zinc-300 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900"
@@ -278,7 +284,7 @@ export function MetalItemsList({
             type="button"
             onClick={() => onCategoryFilterChange(categoryFilter === c.id ? null : c.id)}
             className={clsx(
-              "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+              "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors",
               categoryFilter === c.id
                 ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900"
                 : "border border-zinc-300 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900"
@@ -293,7 +299,7 @@ export function MetalItemsList({
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search by name or mint…"
-        className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
+        className="w-full rounded-md border border-zinc-300 px-3 py-1.5 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
       />
 
       {!loading && groups.length === 0 ? (
@@ -301,11 +307,11 @@ export function MetalItemsList({
           No items match these filters.
         </p>
       ) : (
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-4">
           {groups.map((metalGroup) => (
-            <div key={metalGroup.metal} className="flex flex-col gap-4">
+            <div key={metalGroup.metal} className="flex flex-col gap-3">
               {groups.length > 1 && (
-                <div className="flex items-baseline justify-between border-b border-zinc-200 pb-1.5 dark:border-zinc-800">
+                <div className="flex items-baseline justify-between border-b border-zinc-200 pb-1 dark:border-zinc-800">
                   <h2 className="flex items-center gap-1.5 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
                     <span
                       className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -327,7 +333,9 @@ export function MetalItemsList({
                   toggleSeries={toggleSeries}
                   spotPrices={spotPrices}
                   setEditing={setEditing}
-                  setQuickEditing={setQuickEditing}
+                  quickEditingId={quickEditingId}
+                  toggleQuickEdit={toggleQuickEdit}
+                  setQuickEditingId={setQuickEditingId}
                   deleteItem={deleteItem}
                 />
               ))}
@@ -338,17 +346,6 @@ export function MetalItemsList({
 
       {editing && (
         <EditMetalItemModal item={editing} onClose={() => setEditing(null)} spotPrices={spotPrices} />
-      )}
-      {quickEditing && (
-        <QuickEditQuantityModal
-          item={quickEditing}
-          onClose={() => setQuickEditing(null)}
-          onEditFullDetails={() => {
-            setEditing(quickEditing);
-            setQuickEditing(null);
-          }}
-          spotPrices={spotPrices}
-        />
       )}
     </div>
   );
@@ -361,7 +358,9 @@ function CategorySection({
   toggleSeries,
   spotPrices,
   setEditing,
-  setQuickEditing,
+  quickEditingId,
+  toggleQuickEdit,
+  setQuickEditingId,
   deleteItem,
 }: {
   group: CategoryGroup;
@@ -370,12 +369,14 @@ function CategorySection({
   toggleSeries: (key: string) => void;
   spotPrices: Record<PreciousMetal, number> | null;
   setEditing: (item: MetalItem) => void;
-  setQuickEditing: (item: MetalItem) => void;
+  quickEditingId: string | null;
+  toggleQuickEdit: (id: string) => void;
+  setQuickEditingId: (id: string | null) => void;
   deleteItem: (item: MetalItem) => void;
 }) {
   return (
     <div>
-      <div className="mb-1.5 flex items-baseline justify-between px-0.5">
+      <div className="mb-1 flex items-baseline justify-between px-0.5">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
           {categoryLabel(group.category)}
         </h3>
@@ -384,7 +385,7 @@ function CategorySection({
         </span>
       </div>
       {group.countryGroups ? (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2.5">
           {group.countryGroups.map((country) => (
             <div key={country.key}>
               <div className="mb-1 flex items-baseline justify-between px-0.5">
@@ -403,7 +404,9 @@ function CategorySection({
                 toggleSeries={toggleSeries}
                 spotPrices={spotPrices}
                 setEditing={setEditing}
-                setQuickEditing={setQuickEditing}
+                quickEditingId={quickEditingId}
+                toggleQuickEdit={toggleQuickEdit}
+                setQuickEditingId={setQuickEditingId}
                 deleteItem={deleteItem}
               />
             </div>
@@ -417,7 +420,9 @@ function CategorySection({
           toggleSeries={toggleSeries}
           spotPrices={spotPrices}
           setEditing={setEditing}
-          setQuickEditing={setQuickEditing}
+          quickEditingId={quickEditingId}
+          toggleQuickEdit={toggleQuickEdit}
+          setQuickEditingId={setQuickEditingId}
           deleteItem={deleteItem}
         />
       )}
@@ -432,7 +437,9 @@ function SeriesList({
   toggleSeries,
   spotPrices,
   setEditing,
-  setQuickEditing,
+  quickEditingId,
+  toggleQuickEdit,
+  setQuickEditingId,
   deleteItem,
 }: {
   series: SeriesGroup[];
@@ -441,7 +448,9 @@ function SeriesList({
   toggleSeries: (key: string) => void;
   spotPrices: Record<PreciousMetal, number> | null;
   setEditing: (item: MetalItem) => void;
-  setQuickEditing: (item: MetalItem) => void;
+  quickEditingId: string | null;
+  toggleQuickEdit: (id: string) => void;
+  setQuickEditingId: (id: string | null) => void;
   deleteItem: (item: MetalItem) => void;
 }) {
   return (
@@ -455,7 +464,7 @@ function SeriesList({
               <button
                 type="button"
                 onClick={() => toggleSeries(s.key)}
-                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-zinc-50 dark:hover:bg-zinc-900"
+                className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-zinc-50 dark:hover:bg-zinc-900"
               >
                 <div className="min-w-0">
                   <p className="flex items-center gap-1.5 truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
@@ -477,23 +486,21 @@ function SeriesList({
                 <ul className="divide-y divide-zinc-50 border-t border-zinc-100 dark:divide-zinc-900 dark:border-zinc-900">
                   {s.items.map((item) => (
                     <li key={item.id}>
-                      <SwipeableRow
-                        onTap={() => setEditing(item)}
-                        onEdit={() => setQuickEditing(item)}
-                        onDelete={() => deleteItem(item)}
-                        className="bg-zinc-50/50 hover:bg-zinc-100 dark:bg-zinc-900/30 dark:hover:bg-zinc-900"
+                      <div
+                        onClick={() => toggleQuickEdit(item.id)}
+                        className="flex cursor-pointer items-center justify-between gap-3 py-2 pr-4 pl-9 hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
                       >
-                        <div className="flex w-full items-center justify-between gap-3 py-2 pr-4 pl-9">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm text-zinc-700 dark:text-zinc-300">
-                              {item.year ? `${item.year}` : "Undated"}
-                              {item.condition ? ` · ${item.condition}` : ""}
-                            </p>
-                            <p className="mt-0.5 truncate text-xs text-zinc-400 dark:text-zinc-600">
-                              {itemSubline(item, { includeCondition: false })}
-                            </p>
-                          </div>
-                          <div className="shrink-0 text-right">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm text-zinc-700 dark:text-zinc-300">
+                            {item.year ? `${item.year}` : "Undated"}
+                            {item.condition ? ` · ${item.condition}` : ""}
+                          </p>
+                          <p className="mt-0.5 truncate text-xs text-zinc-400 dark:text-zinc-600">
+                            {itemSubline(item, { includeCondition: false })}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-3">
+                          <div className="text-right">
                             <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
                               {formatCurrency(itemValue(item, spotPrices))}
                             </p>
@@ -501,8 +508,32 @@ function SeriesList({
                               {item.quantity} × {formatTroyOz(item.troy_oz_each)}
                             </p>
                           </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteItem(item);
+                            }}
+                            className="text-xs font-medium text-red-500 hover:text-red-700"
+                          >
+                            Delete
+                          </button>
                         </div>
-                      </SwipeableRow>
+                      </div>
+                      {quickEditingId === item.id && (
+                        <div className="border-t border-zinc-100 bg-zinc-50 px-4 py-3 pl-9 dark:border-zinc-900 dark:bg-zinc-900">
+                          <QuickEditQuantityFields
+                            item={item}
+                            onSaved={() => setQuickEditingId(null)}
+                            onCancel={() => setQuickEditingId(null)}
+                            onEditFullDetails={() => {
+                              setEditing(item);
+                              setQuickEditingId(null);
+                            }}
+                            spotPrices={spotPrices}
+                          />
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>

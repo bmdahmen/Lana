@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { formatCurrency, formatTroyOz } from "@/lib/format";
 import type { PreciousMetal } from "@/lib/asset-classes";
 import {
@@ -31,10 +31,12 @@ export function PreciousMetalsDashboard({
 
   const [metalFilter, setMetalFilter] = useState<PreciousMetal | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<MetalItemCategory | null>(null);
+  const holdingsRef = useRef<HTMLDivElement | null>(null);
 
   // Clicking a category bar in the Gold/Silver cards filters the Holdings
-  // list below to just that slice -- clicking the same one again clears it,
-  // matching the category-breakdown-to-transaction-list pattern on Spending.
+  // list to just that slice (same category-to-list pattern as Spending) and
+  // scrolls it into view -- Holdings sits right below the cards already, but
+  // this keeps the jump instant even when the chart pushes it lower.
   function selectCategory(metal: PreciousMetal, category: MetalItemCategory) {
     if (metalFilter === metal && categoryFilter === category) {
       setMetalFilter(null);
@@ -42,11 +44,17 @@ export function PreciousMetalsDashboard({
     } else {
       setMetalFilter(metal);
       setCategoryFilter(category);
+      holdingsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
+      <div className="rounded-xl border border-zinc-200 bg-white p-4 sm:p-6 dark:border-zinc-800 dark:bg-zinc-950">
+        <h2 className="mb-3 text-sm font-medium text-zinc-500">Value over time</h2>
+        <MetalValueChart points={valueHistory} />
+      </div>
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <MetalSummaryCard
           metal="gold"
@@ -62,44 +70,7 @@ export function PreciousMetalsDashboard({
         />
       </div>
 
-      <div className="rounded-xl border border-zinc-200 bg-white p-4 sm:p-6 dark:border-zinc-800 dark:bg-zinc-950">
-        <h2 className="mb-4 text-sm font-medium text-zinc-500">Value over time</h2>
-        <MetalValueChart points={valueHistory} />
-      </div>
-
-      <div className="grid grid-cols-3 gap-2">
-        <SpotCard label="Gold spot" value={formatCurrency(spotPrices.gold)} sublabel="per troy oz" color="--chart-gold" />
-        <SpotCard label="Silver spot" value={formatCurrency(spotPrices.silver)} sublabel="per troy oz" color="--chart-silver" />
-        <SpotCard label="Gold/Silver ratio" value={ratio.toFixed(1)} sublabel="oz of silver per oz gold" />
-      </div>
-
-      {totalCostBasis > 0 && (
-        <div className="rounded-xl border border-zinc-200 bg-white p-4 sm:p-6 dark:border-zinc-800 dark:bg-zinc-950">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-zinc-500">Cost basis (known purchases)</p>
-              <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-                {formatCurrency(totalCostBasis)}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-sm font-medium text-zinc-500">Unrealized</p>
-              <p
-                className="text-lg font-semibold"
-                style={{ color: totalValue - totalCostBasis >= 0 ? "var(--positive)" : "var(--negative)" }}
-              >
-                {totalValue - totalCostBasis >= 0 ? "+" : ""}
-                {formatCurrency(totalValue - totalCostBasis)}
-              </p>
-            </div>
-          </div>
-          <p className="mt-2 text-xs text-zinc-500">
-            Only reflects items with a recorded purchase price — many older lots don&apos;t have one.
-          </p>
-        </div>
-      )}
-
-      <div className="flex flex-col gap-3">
+      <div ref={holdingsRef} className="flex flex-col gap-2 scroll-mt-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium text-zinc-500">
             Holdings
@@ -136,29 +107,46 @@ export function PreciousMetalsDashboard({
           onCategoryFilterChange={setCategoryFilter}
         />
       </div>
-    </div>
-  );
-}
 
-function SpotCard({
-  label,
-  value,
-  sublabel,
-  color,
-}: {
-  label: string;
-  value: string;
-  sublabel: string;
-  color?: string;
-}) {
-  return (
-    <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2.5 dark:border-zinc-800 dark:bg-zinc-950">
-      <p className="flex items-center gap-1.5 text-xs font-medium text-zinc-500">
-        {color && <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: `var(${color})` }} />}
-        {label}
-      </p>
-      <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">{value}</p>
-      <p className="text-xs text-zinc-400 dark:text-zinc-600">{sublabel}</p>
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-950">
+        <span className="flex items-center gap-1.5 text-xs text-zinc-500">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: "var(--chart-gold)" }} />
+          Gold <span className="font-semibold text-zinc-900 dark:text-zinc-50">{formatCurrency(spotPrices.gold)}</span>
+        </span>
+        <span className="flex items-center gap-1.5 text-xs text-zinc-500">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: "var(--chart-silver)" }} />
+          Silver <span className="font-semibold text-zinc-900 dark:text-zinc-50">{formatCurrency(spotPrices.silver)}</span>
+        </span>
+        <span className="text-xs text-zinc-500">
+          GSR <span className="font-semibold text-zinc-900 dark:text-zinc-50">{ratio.toFixed(1)}</span>
+        </span>
+      </div>
+
+      {totalCostBasis > 0 && (
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 sm:p-6 dark:border-zinc-800 dark:bg-zinc-950">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-zinc-500">Cost basis (known purchases)</p>
+              <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                {formatCurrency(totalCostBasis)}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-medium text-zinc-500">Unrealized</p>
+              <p
+                className="text-lg font-semibold"
+                style={{ color: totalValue - totalCostBasis >= 0 ? "var(--positive)" : "var(--negative)" }}
+              >
+                {totalValue - totalCostBasis >= 0 ? "+" : ""}
+                {formatCurrency(totalValue - totalCostBasis)}
+              </p>
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-zinc-500">
+            Only reflects items with a recorded purchase price — many older lots don&apos;t have one.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -178,8 +166,8 @@ function MetalSummaryCard({
   const max = Math.max(...categories.map((c) => c.value), 1);
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="mb-3 flex items-baseline justify-between">
+    <div className="rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950">
+      <div className="mb-2 flex items-baseline justify-between">
         <h3 className="flex items-center gap-1.5 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
           <span
             className="h-2.5 w-2.5 rounded-full"
@@ -189,13 +177,13 @@ function MetalSummaryCard({
         </h3>
         <span className="text-sm text-zinc-500">{formatTroyOz(summary.troyOz[metal])}</span>
       </div>
-      <p className="mb-4 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+      <p className="mb-3 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
         {formatCurrency(summary.value[metal])}
       </p>
       {categories.length === 0 ? (
         <p className="text-sm text-zinc-500">No {metal} items yet.</p>
       ) : (
-        <ul className="flex flex-col gap-2.5">
+        <ul className="flex flex-col gap-2">
           {categories.map((c) => {
             const isActive = activeCategory === c.category;
             return (
