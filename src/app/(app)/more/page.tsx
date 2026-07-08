@@ -3,6 +3,11 @@ import { LogoutButton } from "@/components/logout-button";
 
 const LINKS = [
   { href: "/net-worth", label: "Net Worth breakdown", description: "Full history by category" },
+  {
+    href: "/precious-metals",
+    label: "Precious Metals",
+    description: "Spot prices, holdings breakdown, and your collection",
+  },
   { href: "/more/rules", label: "Categorization rules", description: "View, edit, and remove auto-tagging rules" },
 ];
 

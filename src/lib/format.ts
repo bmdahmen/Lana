@@ -2,6 +2,10 @@ export function formatCurrency(amount: number, currency = "USD"): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount);
 }
 
+export function formatTroyOz(amount: number): string {
+  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 3 }).format(amount)} oz`;
+}
+
 export function formatCompactCurrency(amount: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",

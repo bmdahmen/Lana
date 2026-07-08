@@ -22,6 +22,7 @@ const SIDE_LINKS = [
   { href: "/accounts", label: "Accounts" },
   { href: "/spending", label: "Spending" },
   { href: "/investments", label: "Investments" },
+  { href: "/precious-metals", label: "Precious Metals" },
   { href: "/more/rules", label: "Rules" },
 ];
 
