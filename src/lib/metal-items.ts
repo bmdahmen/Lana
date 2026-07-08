@@ -18,6 +18,23 @@ export function categoryLabel(category: string): string {
   return METAL_ITEM_CATEGORIES.find((c) => c.id === category)?.label ?? category;
 }
 
+/** Sovereign-mint issuers -- only meaningful for the "Government" category
+ *  (bullion_coin), where each series (American Silver Eagle, Austrian
+ *  Philharmonics, ...) has one consistent issuing country across its lots. */
+export const MINT_COUNTRY: Record<string, { flag: string; name: string }> = {
+  US: { flag: "🇺🇸", name: "United States" },
+  CAN: { flag: "🇨🇦", name: "Canada" },
+  AUS: { flag: "🇦🇹", name: "Austria" },
+  BRI: { flag: "🇬🇧", name: "Britain" },
+  MEX: { flag: "🇲🇽", name: "Mexico" },
+  Fiji: { flag: "🇫🇯", name: "Fiji" },
+};
+
+export function mintCountry(mint: string | null): { flag: string; name: string } | null {
+  if (!mint) return null;
+  return MINT_COUNTRY[mint] ?? null;
+}
+
 export interface MetalItem {
   id: string;
   metal: PreciousMetal;
@@ -173,9 +190,12 @@ export async function syncMetalCollectionAccounts(db: D1Database): Promise<void>
   await invalidateCache(CACHE_KEYS.accountsList, CACHE_KEYS.homeDashboard);
 }
 
-/** account_balance_history for the gold/silver manual account(s), pivoted
- *  into {date, gold, silver} points for the collection value chart --
- *  reuses the same daily snapshots that already drive the net worth chart. */
+/** Value-over-time points for the collection value chart, merging two
+ *  sources: `metal_value_history` (monthly figures backfilled from the old
+ *  La Lana spreadsheet, back to 2023) and `account_balance_history` for the
+ *  gold/silver manual account(s) (daily snapshots the app has taken itself
+ *  since the collection was added here) -- the latter wins on any
+ *  overlapping date since it's the more precise, current-generation source. */
 export interface MetalValuePoint {
   date: string;
   gold: number;
@@ -183,19 +203,29 @@ export interface MetalValuePoint {
 }
 
 export async function getMetalValueHistory(db: D1Database): Promise<MetalValuePoint[]> {
-  const result = await db
-    .prepare(
-      `SELECT abh.date, a.precious_metal as metal, SUM(abh.current_balance) as total
-       FROM account_balance_history abh
-       JOIN account a ON a.id = abh.account_id
-       WHERE a.precious_metal IS NOT NULL AND a.is_closed = 0
-       GROUP BY abh.date, a.precious_metal
-       ORDER BY abh.date ASC`
-    )
-    .all<{ date: string; metal: PreciousMetal; total: number }>();
+  const [backfill, live] = await Promise.all([
+    db
+      .prepare(`SELECT metal, date, value_usd FROM metal_value_history ORDER BY date ASC`)
+      .all<{ metal: PreciousMetal; date: string; value_usd: number }>(),
+    db
+      .prepare(
+        `SELECT abh.date, a.precious_metal as metal, SUM(abh.current_balance) as total
+         FROM account_balance_history abh
+         JOIN account a ON a.id = abh.account_id
+         WHERE a.precious_metal IS NOT NULL AND a.is_closed = 0
+         GROUP BY abh.date, a.precious_metal
+         ORDER BY abh.date ASC`
+      )
+      .all<{ date: string; metal: PreciousMetal; total: number }>(),
+  ]);
 
   const byDate = new Map<string, { gold: number; silver: number }>();
-  for (const row of result.results ?? []) {
+  for (const row of backfill.results ?? []) {
+    const bucket = byDate.get(row.date) ?? { gold: 0, silver: 0 };
+    bucket[row.metal] = row.value_usd;
+    byDate.set(row.date, bucket);
+  }
+  for (const row of live.results ?? []) {
     const bucket = byDate.get(row.date) ?? { gold: 0, silver: 0 };
     bucket[row.metal] = row.total;
     byDate.set(row.date, bucket);

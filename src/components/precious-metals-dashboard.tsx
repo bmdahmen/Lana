@@ -1,8 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { formatCurrency, formatTroyOz } from "@/lib/format";
 import type { PreciousMetal } from "@/lib/asset-classes";
-import { categoryLabel, type MetalCollectionSummary, type MetalItem, type MetalValuePoint } from "@/lib/metal-items";
+import {
+  categoryLabel,
+  type MetalCollectionSummary,
+  type MetalItem,
+  type MetalItemCategory,
+  type MetalValuePoint,
+} from "@/lib/metal-items";
 import { MetalValueChart } from "@/components/metal-value-chart";
 import { AddMetalItemButton } from "@/components/metal-item-modal";
 import { MetalItemsList } from "@/components/metal-items-list";
@@ -20,16 +27,39 @@ export function PreciousMetalsDashboard({
 }) {
   const totalValue = summary.value.gold + summary.value.silver;
   const totalCostBasis = summary.costBasis.gold + summary.costBasis.silver;
-  const totalItems = summary.itemCount.gold + summary.itemCount.silver;
   const ratio = spotPrices.silver > 0 ? spotPrices.gold / spotPrices.silver : 0;
+
+  const [metalFilter, setMetalFilter] = useState<PreciousMetal | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<MetalItemCategory | null>(null);
+
+  // Clicking a category bar in the Gold/Silver cards filters the Holdings
+  // list below to just that slice -- clicking the same one again clears it,
+  // matching the category-breakdown-to-transaction-list pattern on Spending.
+  function selectCategory(metal: PreciousMetal, category: MetalItemCategory) {
+    if (metalFilter === metal && categoryFilter === category) {
+      setMetalFilter(null);
+      setCategoryFilter(null);
+    } else {
+      setMetalFilter(metal);
+      setCategoryFilter(category);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <SpotCard label="Gold spot" value={formatCurrency(spotPrices.gold)} sublabel="per troy oz" color="--chart-gold" />
-        <SpotCard label="Silver spot" value={formatCurrency(spotPrices.silver)} sublabel="per troy oz" color="--chart-silver" />
-        <SpotCard label="Gold/Silver ratio" value={ratio.toFixed(1)} sublabel="oz of silver per oz gold" />
-        <SpotCard label="Collection value" value={formatCurrency(totalValue)} sublabel={`${totalItems} items`} />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <MetalSummaryCard
+          metal="gold"
+          summary={summary}
+          activeCategory={metalFilter === "gold" ? categoryFilter : null}
+          onSelectCategory={(category) => selectCategory("gold", category)}
+        />
+        <MetalSummaryCard
+          metal="silver"
+          summary={summary}
+          activeCategory={metalFilter === "silver" ? categoryFilter : null}
+          onSelectCategory={(category) => selectCategory("silver", category)}
+        />
       </div>
 
       <div className="rounded-xl border border-zinc-200 bg-white p-4 sm:p-6 dark:border-zinc-800 dark:bg-zinc-950">
@@ -37,9 +67,10 @@ export function PreciousMetalsDashboard({
         <MetalValueChart points={valueHistory} />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <MetalSummaryCard metal="gold" summary={summary} />
-        <MetalSummaryCard metal="silver" summary={summary} />
+      <div className="grid grid-cols-3 gap-2">
+        <SpotCard label="Gold spot" value={formatCurrency(spotPrices.gold)} sublabel="per troy oz" color="--chart-gold" />
+        <SpotCard label="Silver spot" value={formatCurrency(spotPrices.silver)} sublabel="per troy oz" color="--chart-silver" />
+        <SpotCard label="Gold/Silver ratio" value={ratio.toFixed(1)} sublabel="oz of silver per oz gold" />
       </div>
 
       {totalCostBasis > 0 && (
@@ -70,10 +101,40 @@ export function PreciousMetalsDashboard({
 
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium text-zinc-500">Holdings</h2>
-          <AddMetalItemButton spotPrices={spotPrices} />
+          <h2 className="text-sm font-medium text-zinc-500">
+            Holdings
+            {(metalFilter || categoryFilter) && (
+              <>
+                {" · "}
+                {metalFilter ? (metalFilter === "gold" ? "Gold" : "Silver") : "All metals"}
+                {categoryFilter ? ` · ${categoryLabel(categoryFilter)}` : ""}
+              </>
+            )}
+          </h2>
+          <div className="flex items-center gap-3">
+            {(metalFilter || categoryFilter) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMetalFilter(null);
+                  setCategoryFilter(null);
+                }}
+                className="text-xs font-medium text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+              >
+                Clear filter
+              </button>
+            )}
+            <AddMetalItemButton spotPrices={spotPrices} />
+          </div>
         </div>
-        <MetalItemsList initialItems={initialItems} spotPrices={spotPrices} />
+        <MetalItemsList
+          initialItems={initialItems}
+          spotPrices={spotPrices}
+          metalFilter={metalFilter}
+          categoryFilter={categoryFilter}
+          onMetalFilterChange={setMetalFilter}
+          onCategoryFilterChange={setCategoryFilter}
+        />
       </div>
     </div>
   );
@@ -102,7 +163,17 @@ function SpotCard({
   );
 }
 
-function MetalSummaryCard({ metal, summary }: { metal: PreciousMetal; summary: MetalCollectionSummary }) {
+function MetalSummaryCard({
+  metal,
+  summary,
+  activeCategory,
+  onSelectCategory,
+}: {
+  metal: PreciousMetal;
+  summary: MetalCollectionSummary;
+  activeCategory: MetalItemCategory | null;
+  onSelectCategory: (category: MetalItemCategory) => void;
+}) {
   const categories = summary.byCategory[metal];
   const max = Math.max(...categories.map((c) => c.value), 1);
 
@@ -125,22 +196,38 @@ function MetalSummaryCard({ metal, summary }: { metal: PreciousMetal; summary: M
         <p className="text-sm text-zinc-500">No {metal} items yet.</p>
       ) : (
         <ul className="flex flex-col gap-2.5">
-          {categories.map((c) => (
-            <li key={c.category}>
-              <div className="mb-1 flex items-center justify-between text-xs">
-                <span className="text-zinc-600 dark:text-zinc-400">
-                  {categoryLabel(c.category)} · {formatTroyOz(c.troyOz)}
-                </span>
-                <span className="font-medium text-zinc-900 dark:text-zinc-50">{formatCurrency(c.value)}</span>
-              </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-900">
-                <div
-                  className="h-full rounded-full"
-                  style={{ width: `${(c.value / max) * 100}%`, backgroundColor: `var(--chart-${metal})` }}
-                />
-              </div>
-            </li>
-          ))}
+          {categories.map((c) => {
+            const isActive = activeCategory === c.category;
+            return (
+              <li key={c.category}>
+                <button
+                  type="button"
+                  onClick={() => onSelectCategory(c.category)}
+                  aria-pressed={isActive}
+                  className="group w-full rounded-md text-left"
+                >
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span className="text-zinc-600 group-hover:underline dark:text-zinc-400">
+                      {categoryLabel(c.category)} · {formatTroyOz(c.troyOz)}
+                    </span>
+                    <span className="font-medium text-zinc-900 group-hover:underline dark:text-zinc-50">
+                      {formatCurrency(c.value)}
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-900">
+                    <div
+                      className="h-full rounded-full transition-opacity"
+                      style={{
+                        width: `${(c.value / max) * 100}%`,
+                        backgroundColor: `var(--chart-${metal})`,
+                        opacity: activeCategory && !isActive ? 0.35 : 1,
+                      }}
+                    />
+                  </div>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

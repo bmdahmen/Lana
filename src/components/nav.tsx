@@ -12,7 +12,7 @@ const TABS: { href: string; label: string; icon: (active: boolean) => ReactNode 
   { href: "/", label: "Home", icon: HomeIcon },
   { href: "/spending", label: "Spending", icon: SpendingIcon },
   { href: "/investments", label: "Invest", icon: InvestIcon },
-  { href: "/accounts", label: "Accounts", icon: AccountsIcon },
+  { href: "/precious-metals", label: "Metals", icon: MetalsIcon },
   { href: "/more", label: "More", icon: MoreIcon },
 ];
 
@@ -123,12 +123,12 @@ function InvestIcon(active: boolean) {
   );
 }
 
-function AccountsIcon(active: boolean) {
+function MetalsIcon(active: boolean) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.25 : 1.75} strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="7" width="18" height="12" rx="2" />
-      <path d="M3 10h18" />
-      <path d="M7 15h4" />
+      <ellipse cx="12" cy="6" rx="7" ry="3" />
+      <path d="M5 6v5.5c0 1.66 3.13 3 7 3s7-1.34 7-3V6" />
+      <path d="M5 11.5V17c0 1.66 3.13 3 7 3s7-1.34 7-3v-5.5" />
     </svg>
   );
 }

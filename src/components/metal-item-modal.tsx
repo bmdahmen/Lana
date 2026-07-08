@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PRECIOUS_METALS, type PreciousMetal } from "@/lib/asset-classes";
 import { METAL_ITEM_CATEGORIES, type MetalItem, type MetalItemCategory } from "@/lib/metal-items";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatTroyOz } from "@/lib/format";
 
 interface FormState {
   metal: PreciousMetal;
@@ -403,6 +403,135 @@ export function EditMetalItemModal({
               className="text-sm font-medium text-red-500 hover:text-red-700 disabled:opacity-50"
             >
               {deleting ? "Removing..." : "Remove"}
+            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-md px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900"
+              >
+                {submitting ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The fast path for "I bought more of a coin/bar I already track" -- just
+ * the quantity, with +/- steppers, reached via the swipe-left Edit action on
+ * a holdings row. "Edit full details" drops into the full EditMetalItemModal
+ * for everything else (condition, purchase price, notes, ...).
+ */
+export function QuickEditQuantityModal({
+  item,
+  onClose,
+  onEditFullDetails,
+  spotPrices,
+}: {
+  item: MetalItem;
+  onClose: () => void;
+  onEditFullDetails: () => void;
+  spotPrices: Record<PreciousMetal, number> | null;
+}) {
+  const router = useRouter();
+  const [quantity, setQuantity] = useState(String(item.quantity));
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const qty = Number(quantity) || 0;
+  const totalOz = qty * item.troy_oz_each;
+  const estValue = spotPrices ? totalOz * spotPrices[item.metal] : null;
+
+  function adjust(delta: number) {
+    setQuantity((prev) => String(Math.max(0, (Number(prev) || 0) + delta)));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/metal-items/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quantity: qty }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        setError(data?.error ?? "Failed to update quantity");
+        return;
+      }
+      onClose();
+      router.refresh();
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-xs rounded-xl bg-white p-6 shadow-lg dark:bg-zinc-950">
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+          {item.year ? `${item.year} ` : ""}
+          {item.name}
+        </h2>
+        <p className="mb-4 text-xs text-zinc-500">
+          {[item.mint, item.condition].filter(Boolean).join(" · ") || " "}
+        </p>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Quantity</label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => adjust(-1)}
+                aria-label="Decrease quantity"
+                className="h-10 w-10 shrink-0 rounded-md border border-zinc-300 text-lg font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+              >
+                −
+              </button>
+              <input
+                required
+                type="number"
+                inputMode="numeric"
+                min="0"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                className="w-full rounded-md border border-zinc-300 px-3 py-2 text-center text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
+              />
+              <button
+                type="button"
+                onClick={() => adjust(1)}
+                aria-label="Increase quantity"
+                className="h-10 w-10 shrink-0 rounded-md border border-zinc-300 text-lg font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+              >
+                +
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-zinc-500">
+              {formatTroyOz(totalOz)}
+              {estValue !== null && <> ≈ {formatCurrency(estValue)}</>}
+            </p>
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={onEditFullDetails}
+              className="text-xs font-medium text-zinc-400 underline underline-offset-2 hover:text-zinc-700 dark:hover:text-zinc-200"
+            >
+              Edit full details
             </button>
             <div className="flex gap-2">
               <button
