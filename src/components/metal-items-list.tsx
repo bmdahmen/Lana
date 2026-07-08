@@ -164,6 +164,9 @@ export function MetalItemsList({
   categoryFilter,
   onMetalFilterChange,
   onCategoryFilterChange,
+  nameOptions,
+  conditionOptions,
+  refreshKey,
 }: {
   initialItems: MetalItem[];
   spotPrices: Record<PreciousMetal, number> | null;
@@ -171,6 +174,11 @@ export function MetalItemsList({
   categoryFilter: MetalItemCategory | null;
   onMetalFilterChange: (metal: PreciousMetal | null) => void;
   onCategoryFilterChange: (category: MetalItemCategory | null) => void;
+  nameOptions: string[];
+  conditionOptions: string[];
+  /** Bumped by the parent (e.g. after "Add item") to force a reload here
+   *  without this component needing to know why. */
+  refreshKey?: number;
 }) {
   const [query, setQuery] = useState("");
   const [items, setItems] = useState(initialItems);
@@ -200,7 +208,7 @@ export function MetalItemsList({
   useEffect(() => {
     const timeout = setTimeout(load, 200);
     return () => clearTimeout(timeout);
-  }, [load]);
+  }, [load, refreshKey]);
 
   const groups = useMemo(() => groupItems(items, spotPrices), [items, spotPrices]);
 
@@ -232,6 +240,7 @@ export function MetalItemsList({
       return;
     }
     router.refresh();
+    load();
   }
 
   return (
@@ -338,6 +347,7 @@ export function MetalItemsList({
                   toggleQuickEdit={toggleQuickEdit}
                   setQuickEditingId={setQuickEditingId}
                   deleteItem={deleteItem}
+                  reload={load}
                 />
               ))}
             </div>
@@ -346,7 +356,16 @@ export function MetalItemsList({
       )}
 
       {editing && (
-        <EditMetalItemModal item={editing} onClose={() => setEditing(null)} spotPrices={spotPrices} />
+        <EditMetalItemModal
+          item={editing}
+          onClose={() => {
+            setEditing(null);
+            load();
+          }}
+          spotPrices={spotPrices}
+          nameOptions={nameOptions}
+          conditionOptions={conditionOptions}
+        />
       )}
     </div>
   );
@@ -363,6 +382,7 @@ function CategorySection({
   toggleQuickEdit,
   setQuickEditingId,
   deleteItem,
+  reload,
 }: {
   group: CategoryGroup;
   searching: boolean;
@@ -374,6 +394,7 @@ function CategorySection({
   toggleQuickEdit: (id: string) => void;
   setQuickEditingId: (id: string | null) => void;
   deleteItem: (item: MetalItem) => void;
+  reload: () => void;
 }) {
   return (
     <div>
@@ -409,6 +430,7 @@ function CategorySection({
                 toggleQuickEdit={toggleQuickEdit}
                 setQuickEditingId={setQuickEditingId}
                 deleteItem={deleteItem}
+                reload={reload}
               />
             </div>
           ))}
@@ -425,6 +447,7 @@ function CategorySection({
           toggleQuickEdit={toggleQuickEdit}
           setQuickEditingId={setQuickEditingId}
           deleteItem={deleteItem}
+          reload={reload}
         />
       )}
     </div>
@@ -442,6 +465,7 @@ function SeriesList({
   toggleQuickEdit,
   setQuickEditingId,
   deleteItem,
+  reload,
 }: {
   series: SeriesGroup[];
   searching: boolean;
@@ -453,6 +477,7 @@ function SeriesList({
   toggleQuickEdit: (id: string) => void;
   setQuickEditingId: (id: string | null) => void;
   deleteItem: (item: MetalItem) => void;
+  reload: () => void;
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
@@ -516,7 +541,10 @@ function SeriesList({
                         <div className="border-t border-zinc-100 bg-zinc-50 px-4 py-3 pl-9 dark:border-zinc-900 dark:bg-zinc-900">
                           <QuickEditQuantityFields
                             item={item}
-                            onSaved={() => setQuickEditingId(null)}
+                            onSaved={() => {
+                              setQuickEditingId(null);
+                              reload();
+                            }}
                             onCancel={() => setQuickEditingId(null)}
                             onEditFullDetails={() => {
                               setEditing(item);

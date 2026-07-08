@@ -58,7 +58,10 @@ export function SwipeableRow({
 
   return (
     <div className="relative overflow-hidden">
-      <div className="absolute inset-y-0 right-0 flex" style={{ width: ACTION_WIDTH }}>
+      <div
+        className="absolute inset-y-0 right-0 flex items-center justify-center gap-3 bg-zinc-100 dark:bg-zinc-900"
+        style={{ width: ACTION_WIDTH }}
+      >
         <button
           type="button"
           onClick={() => {
@@ -66,8 +69,7 @@ export function SwipeableRow({
             onEdit();
           }}
           aria-label="Edit"
-          style={{ width: HALF_ACTION_WIDTH }}
-          className="flex items-center justify-center bg-blue-600 text-white active:bg-blue-700"
+          className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800"
         >
           <EditIcon />
         </button>
@@ -78,8 +80,7 @@ export function SwipeableRow({
             onDelete();
           }}
           aria-label="Delete"
-          style={{ width: HALF_ACTION_WIDTH }}
-          className="flex items-center justify-center bg-red-600 text-white active:bg-red-700"
+          className="flex h-9 w-9 items-center justify-center rounded-full text-red-500 hover:bg-red-100 dark:hover:bg-red-950/40"
         >
           <DeleteIcon />
         </button>

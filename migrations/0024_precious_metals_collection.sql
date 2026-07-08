@@ -71,7 +71,7 @@ INSERT INTO metal_item (id, metal, category, name, mint, year, condition, quanti
   ('mitem_041', 'silver', 'bullion_coin', 'American Silver Eagle', 'US', 2025, 'Uncirculated', 100.0, 1.0, 1.0, NULL, NULL),
   ('mitem_042', 'silver', 'bullion_coin', 'American Silver Eagle', 'US', 2024, 'Uncirculated', 38.0, 1.0, 1.0, NULL, NULL),
   ('mitem_043', 'silver', 'bullion_coin', 'American Silver Eagle', 'US', 2023, 'Uncirculated', 160.0, 1.0, 1.0, NULL, NULL),
-  ('mitem_044', 'silver', 'bullion_coin', 'American Silver Eagle (Type 2)', 'US', 2021, 'Uncirculated', 20.0, 1.0, 1.0, NULL, NULL),
+  ('mitem_044', 'silver', 'bullion_coin', 'American Silver Eagle', 'US', 2021, 'Uncirculated (Type 2)', 20.0, 1.0, 1.0, NULL, NULL),
   ('mitem_045', 'silver', 'bullion_coin', 'American Silver Eagle', 'US', 2020, 'Uncirculated', 20.0, 1.0, 1.0, NULL, NULL),
   ('mitem_046', 'silver', 'bullion_coin', 'American Silver Eagle', 'US', 2019, 'Uncirculated', 20.0, 1.0, 1.0, NULL, NULL),
   ('mitem_047', 'silver', 'bullion_coin', 'American Silver Eagle', 'US', 2018, 'Uncirculated', 20.0, 1.0, 1.0, NULL, NULL),

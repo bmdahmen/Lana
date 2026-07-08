@@ -1,10 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PRECIOUS_METALS, type PreciousMetal } from "@/lib/asset-classes";
 import { METAL_ITEM_CATEGORIES, type MetalItem, type MetalItemCategory } from "@/lib/metal-items";
 import { formatCurrency, formatTroyOz } from "@/lib/format";
+
+// Descending so the most recent (most commonly added) years are reachable
+// without scrolling -- native <select> renders as a scrollable wheel picker
+// on iOS/Android, so this doubles as the "year scroll" picker on mobile.
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: CURRENT_YEAR + 1 - 1700 + 1 }, (_, i) => CURRENT_YEAR + 1 - i);
 
 interface FormState {
   metal: PreciousMetal;
@@ -76,15 +82,21 @@ function FormFields({
   form,
   setForm,
   spotPrices,
+  nameOptions,
+  conditionOptions,
 }: {
   form: FormState;
   setForm: (updater: (prev: FormState) => FormState) => void;
   spotPrices: Record<PreciousMetal, number> | null;
+  nameOptions: string[];
+  conditionOptions: string[];
 }) {
   const qty = Number(form.quantity) || 0;
   const ozEach = Number(form.troyOzEach) || 0;
   const totalOz = qty * ozEach;
   const estValue = spotPrices ? totalOz * spotPrices[form.metal] : null;
+  const nameListId = useId();
+  const conditionListId = useId();
 
   return (
     <>
@@ -123,11 +135,17 @@ function FormFields({
         <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Name</label>
         <input
           required
+          list={nameListId}
           value={form.name}
           onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
           placeholder="e.g. American Silver Eagle"
           className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
         />
+        <datalist id={nameListId}>
+          {nameOptions.map((name) => (
+            <option key={name} value={name} />
+          ))}
+        </datalist>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
@@ -142,23 +160,33 @@ function FormFields({
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Year</label>
-          <input
-            type="number"
-            inputMode="numeric"
+          <select
             value={form.year}
             onChange={(e) => setForm((f) => ({ ...f, year: e.target.value }))}
-            placeholder="2024"
             className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
-          />
+          >
+            <option value="">—</option>
+            {YEAR_OPTIONS.map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">Condition</label>
           <input
+            list={conditionListId}
             value={form.condition}
             onChange={(e) => setForm((f) => ({ ...f, condition: e.target.value }))}
             placeholder="Uncirculated"
             className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
           />
+          <datalist id={conditionListId}>
+            {conditionOptions.map((condition) => (
+              <option key={condition} value={condition} />
+            ))}
+          </datalist>
         </div>
       </div>
 
@@ -262,7 +290,17 @@ function FormFields({
   );
 }
 
-export function AddMetalItemButton({ spotPrices }: { spotPrices: Record<PreciousMetal, number> | null }) {
+export function AddMetalItemButton({
+  spotPrices,
+  nameOptions,
+  conditionOptions,
+  onAdded,
+}: {
+  spotPrices: Record<PreciousMetal, number> | null;
+  nameOptions: string[];
+  conditionOptions: string[];
+  onAdded?: () => void;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -287,6 +325,7 @@ export function AddMetalItemButton({ spotPrices }: { spotPrices: Record<Precious
       setOpen(false);
       setForm(emptyForm());
       router.refresh();
+      onAdded?.();
     } finally {
       setSubmitting(false);
     }
@@ -305,7 +344,13 @@ export function AddMetalItemButton({ spotPrices }: { spotPrices: Record<Precious
           <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-white p-6 shadow-lg dark:bg-zinc-950">
             <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">Add item</h2>
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              <FormFields form={form} setForm={setForm} spotPrices={spotPrices} />
+              <FormFields
+                form={form}
+                setForm={setForm}
+                spotPrices={spotPrices}
+                nameOptions={nameOptions}
+                conditionOptions={conditionOptions}
+              />
               {error && <p className="text-sm text-red-600">{error}</p>}
               <div className="mt-2 flex justify-end gap-2">
                 <button
@@ -338,10 +383,14 @@ export function EditMetalItemModal({
   item,
   onClose,
   spotPrices,
+  nameOptions,
+  conditionOptions,
 }: {
   item: MetalItem;
   onClose: () => void;
   spotPrices: Record<PreciousMetal, number> | null;
+  nameOptions: string[];
+  conditionOptions: string[];
 }) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(() => formFromItem(item));
@@ -393,7 +442,13 @@ export function EditMetalItemModal({
       <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-white p-6 shadow-lg dark:bg-zinc-950">
         <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">Edit item</h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <FormFields form={form} setForm={setForm} spotPrices={spotPrices} />
+          <FormFields
+            form={form}
+            setForm={setForm}
+            spotPrices={spotPrices}
+            nameOptions={nameOptions}
+            conditionOptions={conditionOptions}
+          />
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="mt-2 flex items-center justify-between gap-2">
             <button

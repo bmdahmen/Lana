@@ -19,11 +19,15 @@ export function PreciousMetalsDashboard({
   summary,
   valueHistory,
   initialItems,
+  nameOptions,
+  conditionOptions,
 }: {
   spotPrices: Record<PreciousMetal, number>;
   summary: MetalCollectionSummary;
   valueHistory: MetalValuePoint[];
   initialItems: MetalItem[];
+  nameOptions: string[];
+  conditionOptions: string[];
 }) {
   const totalValue = summary.value.gold + summary.value.silver;
   const totalCostBasis = summary.costBasis.gold + summary.costBasis.silver;
@@ -31,6 +35,7 @@ export function PreciousMetalsDashboard({
 
   const [metalFilter, setMetalFilter] = useState<PreciousMetal | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<MetalItemCategory | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const holdingsRef = useRef<HTMLDivElement | null>(null);
 
   // Clicking a category bar in the Gold/Silver cards filters the Holdings
@@ -109,7 +114,12 @@ export function PreciousMetalsDashboard({
                 Clear filter
               </button>
             )}
-            <AddMetalItemButton spotPrices={spotPrices} />
+            <AddMetalItemButton
+              spotPrices={spotPrices}
+              nameOptions={nameOptions}
+              conditionOptions={conditionOptions}
+              onAdded={() => setRefreshKey((k) => k + 1)}
+            />
           </div>
         </div>
         <MetalItemsList
@@ -119,6 +129,9 @@ export function PreciousMetalsDashboard({
           categoryFilter={categoryFilter}
           onMetalFilterChange={setMetalFilter}
           onCategoryFilterChange={setCategoryFilter}
+          nameOptions={nameOptions}
+          conditionOptions={conditionOptions}
+          refreshKey={refreshKey}
         />
       </div>
 
