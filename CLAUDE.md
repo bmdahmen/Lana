@@ -19,3 +19,12 @@ migrations and inspect or fix data yourself — do not ask the user to run
 `wrangler d1 execute` or SQL against production. Only ask the user to run
 something yourself when it genuinely requires access you don't have (e.g.
 a dashboard-only setting).
+
+# Deployment
+
+Pushing to `main` auto-deploys to production (Cloudflare's own build/deploy
+pipeline, not a GitHub Actions workflow in this repo). Don't run
+`npm run cf:deploy` yourself or ask the user to deploy — a push to `main` is
+the deploy. When you push a migration alongside code, remember production
+D1 needs that migration applied too (via `d1_database_query`, per above) —
+pushing code doesn't run migrations for you.
