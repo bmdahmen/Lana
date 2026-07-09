@@ -9,6 +9,7 @@ const exchangeSchema = z.object({
   publicToken: z.string().min(1),
   institutionId: z.string().nullable().optional(),
   institutionName: z.string().nullable().optional(),
+  owner: z.enum(["brian", "emily"]).default("brian"),
 });
 
 export async function POST(request: Request) {
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const plaid = getPlaidClient();
+  const plaid = getPlaidClient(body.data.owner);
   const exchangeResponse = await plaid.itemPublicTokenExchange({
     public_token: body.data.publicToken,
   });
@@ -28,10 +29,17 @@ export async function POST(request: Request) {
 
   await db
     .prepare(
-      `INSERT INTO plaid_item (id, plaid_item_id, access_token, institution_id, institution_name)
-       VALUES (?, ?, ?, ?, ?)`
+      `INSERT INTO plaid_item (id, plaid_item_id, access_token, institution_id, institution_name, owner)
+       VALUES (?, ?, ?, ?, ?, ?)`
     )
-    .bind(itemId, plaidItemId, accessToken, body.data.institutionId ?? null, body.data.institutionName ?? null)
+    .bind(
+      itemId,
+      plaidItemId,
+      accessToken,
+      body.data.institutionId ?? null,
+      body.data.institutionName ?? null,
+      body.data.owner
+    )
     .run();
 
   const accountsResponse = await plaid.accountsGet({ access_token: accessToken });
@@ -40,8 +48,8 @@ export async function POST(request: Request) {
       .prepare(
         `INSERT INTO account (
            id, plaid_item_id, plaid_account_id, name, official_name, type, subtype, mask,
-           current_balance, available_balance, iso_currency_code, is_asset, asset_class
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           current_balance, available_balance, iso_currency_code, is_asset, asset_class, owner
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         newId("acct"),
@@ -56,12 +64,13 @@ export async function POST(request: Request) {
         acc.balances.available ?? null,
         acc.balances.iso_currency_code ?? "USD",
         accountIsAsset(acc.type) ? 1 : 0,
-        derivePlaidAssetClass(acc.type, acc.subtype ?? null)
+        derivePlaidAssetClass(acc.type, acc.subtype ?? null),
+        body.data.owner
       )
       .run();
   }
 
-  await syncPlaidItem(db, { id: itemId, access_token: accessToken, cursor: null });
+  await syncPlaidItem(db, { id: itemId, access_token: accessToken, cursor: null, owner: body.data.owner });
 
   return NextResponse.json({ ok: true });
 }

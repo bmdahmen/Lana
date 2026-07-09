@@ -1,4 +1,5 @@
 import { ASSET_CLASSES, type AssetClass } from "@/lib/asset-classes";
+import { OWNERS, type Owner } from "@/lib/owners";
 import type { NetWorthByClassPoint } from "@/lib/net-worth-range";
 
 export type { NetWorthByClassPoint };
@@ -43,18 +44,27 @@ export async function refreshNetWorthSeriesCache(
   return series;
 }
 
+/** Composite key for an asset class's value scoped to one owner, e.g.
+ *  "cash:brian" -- lets a single flat point carry both the family total
+ *  (under the plain class id, unchanged) and each owner's slice, so owner
+ *  filtering can remap which key a chart line reads from without any
+ *  changes to the aggregation's basic shape. */
+function ownerKey(classId: string, owner: Owner): string {
+  return `${classId}:${owner}`;
+}
+
 async function computeNetWorthSeries(db: D1Database): Promise<NetWorthByClassPoint[]> {
   const result = await db
     .prepare(
-      `SELECT abh.date, a.asset_class, SUM(abh.current_balance) as total
+      `SELECT abh.date, a.asset_class, a.owner, SUM(abh.current_balance) as total
        FROM account_balance_history abh
        JOIN account a ON a.id = abh.account_id
        WHERE a.is_closed = 0 AND a.is_hidden = 0
          AND (a.relevant_until IS NULL OR abh.date <= a.relevant_until)
-       GROUP BY abh.date, a.asset_class
+       GROUP BY abh.date, a.asset_class, a.owner
        ORDER BY abh.date ASC`
     )
-    .all<{ date: string; asset_class: AssetClass; total: number }>();
+    .all<{ date: string; asset_class: AssetClass; owner: Owner; total: number }>();
 
   // A class stops getting new rows once every account that ever contributed
   // to it has passed its relevant_until with nothing open-ended left behind
@@ -79,17 +89,20 @@ async function computeNetWorthSeries(db: D1Database): Promise<NetWorthByClassPoi
   const byDate = new Map<string, Record<string, number>>();
   for (const row of result.results ?? []) {
     const bucket = byDate.get(row.date) ?? {};
-    bucket[row.asset_class] = row.total;
+    bucket[row.asset_class] = (bucket[row.asset_class] ?? 0) + row.total;
+    bucket[ownerKey(row.asset_class, row.owner)] = row.total;
     byDate.set(row.date, bucket);
   }
 
   const dates = [...byDate.keys()].sort();
-  const lastKnown: Partial<Record<AssetClass, number>> = {};
+  const lastKnown: Record<string, number> = {};
 
   const points = dates.map((date) => {
     const bucket = byDate.get(date)!;
     const point: NetWorthByClassPoint = { date, net_worth: 0 };
     let netWorth = 0;
+    const netWorthByOwner: Record<Owner, number> = { brian: 0, emily: 0 };
+
     for (const { id } of ASSET_CLASSES) {
       // Carry forward the last known total when a class has no row for this
       // date (e.g. its account stopped syncing) instead of dropping to zero
@@ -101,14 +114,31 @@ async function computeNetWorthSeries(db: D1Database): Promise<NetWorthByClassPoi
       lastKnown[id] = value;
       point[id] = value;
       netWorth += id === "liabilities" ? -value : value;
+
+      for (const { id: owner } of OWNERS) {
+        const key = ownerKey(id, owner);
+        const ownerValue = bucket[key] ?? (expired ? 0 : lastKnown[key] ?? 0);
+        lastKnown[key] = ownerValue;
+        point[key] = ownerValue;
+        netWorthByOwner[owner] += id === "liabilities" ? -ownerValue : ownerValue;
+      }
     }
     point.net_worth = netWorth;
+    for (const { id: owner } of OWNERS) {
+      point[ownerKey("net_worth", owner)] = netWorthByOwner[owner];
+    }
 
     // The by-class breakdown shows home equity, not gross real estate value
     // and a separate debt line -- net_worth above already accounts for the
     // true liabilities total, so this only affects the displayed category.
     point.real_estate = Number(point.real_estate ?? 0) - Number(point.liabilities ?? 0);
     point.liabilities = 0;
+    for (const { id: owner } of OWNERS) {
+      const realEstateKey = ownerKey("real_estate", owner);
+      const liabilitiesKey = ownerKey("liabilities", owner);
+      point[realEstateKey] = Number(point[realEstateKey] ?? 0) - Number(point[liabilitiesKey] ?? 0);
+      point[liabilitiesKey] = 0;
+    }
 
     return point;
   });

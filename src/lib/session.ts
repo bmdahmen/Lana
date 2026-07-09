@@ -1,8 +1,10 @@
 import { getIronSession, type IronSession, type SessionOptions } from "iron-session";
 import { cookies } from "next/headers";
+import type { Owner } from "@/lib/owners";
 
 export interface SessionData {
   loggedIn: boolean;
+  owner?: Owner;
 }
 
 function getSessionOptions(): SessionOptions {

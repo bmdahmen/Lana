@@ -9,14 +9,16 @@ import {
   type PreciousMetal,
   type Cryptocurrency,
 } from "@/lib/asset-classes";
+import { OWNERS, type Owner } from "@/lib/owners";
 import { formatCurrency } from "@/lib/format";
 import type { AddressSuggestion } from "@/lib/zillow";
 
-export function AddManualAccountButton() {
+export function AddManualAccountButton({ defaultOwner = "brian" }: { defaultOwner?: Owner }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [assetClass, setAssetClass] = useState(ASSET_CLASSES[0].id);
+  const [owner, setOwner] = useState<Owner>(defaultOwner);
   const [balance, setBalance] = useState("");
   const [preciousMetal, setPreciousMetal] = useState<PreciousMetal>("gold");
   const [troyOz, setTroyOz] = useState("");
@@ -83,12 +85,12 @@ export function AddManualAccountButton() {
     setError(null);
     try {
       const body = isPreciousMetal
-        ? { name, assetClass, preciousMetal, metalTroyOz: Number(troyOz) }
+        ? { name, assetClass, owner, preciousMetal, metalTroyOz: Number(troyOz) }
         : isCrypto
-          ? { name, assetClass, cryptoSymbol, cryptoAmount: Number(cryptoAmount) }
+          ? { name, assetClass, owner, cryptoSymbol, cryptoAmount: Number(cryptoAmount) }
           : isRealEstate && !manualRealEstateValue
-          ? { name, assetClass, propertyAddress: propertyAddress.replace(/\s*\n+\s*/g, ", ").trim() }
-          : { name, assetClass, currentBalance: Number(balance) };
+          ? { name, assetClass, owner, propertyAddress: propertyAddress.replace(/\s*\n+\s*/g, ", ").trim() }
+          : { name, assetClass, owner, currentBalance: Number(balance) };
       const res = await fetch("/api/accounts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -151,6 +153,22 @@ export function AddManualAccountButton() {
                   {ASSET_CLASSES.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Owner
+                </label>
+                <select
+                  value={owner}
+                  onChange={(e) => setOwner(e.target.value as Owner)}
+                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
+                >
+                  {OWNERS.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.label}
                     </option>
                   ))}
                 </select>

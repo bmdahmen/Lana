@@ -30,13 +30,15 @@ Cloudflare D1 (SQLite) as the database.
    ```
 
    Open http://localhost:3000 — click "Continue with Google" to sign in. Only
-   the Google account in `GOOGLE_ALLOWED_EMAIL` can sign in; anyone else's
-   Google login is rejected.
+   the Google accounts in `GOOGLE_ALLOWED_EMAIL` (and, if set,
+   `GOOGLE_ALLOWED_EMAIL_EMILY`) can sign in; anyone else's Google login is
+   rejected.
 
 ## Google sign-in setup
 
 Lana has no password — it uses [Google Identity Services](https://developers.google.com/identity/gsi/web)
-("Sign in with Google") and locks access to a single email address.
+("Sign in with Google") and locks access to up to two household members'
+email addresses (Brian and, optionally, Emily).
 
 1. Go to the [Google Cloud Console credentials page](https://console.cloud.google.com/apis/credentials).
 2. Create an **OAuth client ID** → Application type: **Web application**.
@@ -45,8 +47,30 @@ Lana has no password — it uses [Google Identity Services](https://developers.g
    - your deployed URL, e.g. `https://lana.<your-subdomain>.workers.dev`
    - No redirect URI is needed — this uses the token flow, not a redirect.
 4. Copy the generated **Client ID** into `NEXT_PUBLIC_GOOGLE_CLIENT_ID`.
-5. Set `GOOGLE_ALLOWED_EMAIL` to your own Google account email — sign-in attempts
-   from any other account are rejected with a 403.
+5. Set `GOOGLE_ALLOWED_EMAIL` to Brian's Google account email, and (optionally)
+   `GOOGLE_ALLOWED_EMAIL_EMILY` to Emily's — sign-in attempts from any other
+   account are rejected with a 403.
+
+## Multi-user (Brian + Emily)
+
+Each account/item is tagged with an `owner` (`brian` or `emily`), shown as a
+small colored badge on the Accounts page and selectable when linking or
+manually adding an account. The net worth page's owner filter (Brian / Emily
+/ Family, alongside the existing category filter) reads from this tag;
+Family — the default — sums both. Since Plaid credentials are Plaid
+account-level, not just item-level, Emily needs her **own** Plaid developer
+account for her linked banks to sync under her own keys:
+
+1. She signs up at [dashboard.plaid.com/signup](https://dashboard.plaid.com/signup)
+   with her own email, separate from Brian's Plaid account.
+2. She grabs her Client ID and Secret from the dashboard (Sandbox to start;
+   apply for Production access when ready to link real accounts).
+3. Set `PLAID_CLIENT_ID_EMILY` / `PLAID_SECRET_EMILY` (and `PLAID_ENV_EMILY`
+   if it differs from the shared `PLAID_ENV`) to those values.
+
+Until her keys are set, choosing "Emily" in the owner picker when linking a
+new Plaid account will fail — manual accounts (precious metals, real estate,
+etc.) don't need Plaid keys at all and work immediately for either owner.
 
 ## Environment variables
 
@@ -54,11 +78,14 @@ Lana has no password — it uses [Google Identity Services](https://developers.g
 |---|---|
 | `SESSION_SECRET` | Random string, 32+ characters, used to encrypt the session cookie. |
 | `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | OAuth Client ID from Google Cloud Console (see above). Exposed to the browser — this is expected, it's not a secret. |
-| `GOOGLE_ALLOWED_EMAIL` | The only Google account allowed to sign in. |
-| `PLAID_CLIENT_ID` | From the [Plaid dashboard](https://dashboard.plaid.com/team-settings/keys). |
-| `PLAID_SECRET` | Matching secret for your `PLAID_ENV` (sandbox/development/production). |
+| `GOOGLE_ALLOWED_EMAIL` | Brian's Google account email. |
+| `GOOGLE_ALLOWED_EMAIL_EMILY` | Optional. Emily's Google account email. |
+| `PLAID_CLIENT_ID` | Brian's, from the [Plaid dashboard](https://dashboard.plaid.com/team-settings/keys). |
+| `PLAID_SECRET` | Matching secret for `PLAID_ENV`. |
 | `PLAID_ENV` | `sandbox`, `development`, or `production`. |
-| `PLAID_WEBHOOK_URL` | Optional. Your deployed URL + `/api/plaid/webhook`, so Plaid can push transaction updates instead of relying on manual sync. |
+| `PLAID_CLIENT_ID_EMILY` / `PLAID_SECRET_EMILY` | Optional. Emily's own Plaid credentials (see "Multi-user" above). |
+| `PLAID_ENV_EMILY` | Optional. Falls back to `PLAID_ENV` if unset. |
+| `PLAID_WEBHOOK_URL` | Optional. Your deployed URL + `/api/plaid/webhook`, so Plaid can push transaction updates instead of relying on manual sync. Shared by both owners' items. |
 
 ## Precious metals (gold, silver)
 
@@ -146,6 +173,11 @@ npx wrangler secret put PLAID_CLIENT_ID
 npx wrangler secret put PLAID_SECRET
 npx wrangler secret put PLAID_ENV
 npx wrangler secret put PLAID_WEBHOOK_URL
+# Optional, once Emily has her own Plaid credentials (see "Multi-user" above):
+npx wrangler secret put GOOGLE_ALLOWED_EMAIL_EMILY
+npx wrangler secret put PLAID_CLIENT_ID_EMILY
+npx wrangler secret put PLAID_SECRET_EMILY
+npx wrangler secret put PLAID_ENV_EMILY
 ```
 
 `NEXT_PUBLIC_GOOGLE_CLIENT_ID` is different: Next.js inlines `NEXT_PUBLIC_*`
@@ -177,9 +209,9 @@ needed. Two settings matter there:
   build time, so it has to be present there, not just as a Worker secret.
 
 Runtime secrets (`SESSION_SECRET`, `GOOGLE_ALLOWED_EMAIL`, `PLAID_CLIENT_ID`,
-`PLAID_SECRET`, `PLAID_ENV`) stay exactly as set via `wrangler secret put` —
-Cloudflare's builder reads those from the Worker itself, not from the build
-environment.
+`PLAID_SECRET`, `PLAID_ENV`, and Emily's equivalents) stay exactly as set via
+`wrangler secret put` — Cloudflare's builder reads those from the Worker
+itself, not from the build environment.
 
 Once both are set correctly, `git push` to `main` is the entire deploy
 workflow — no manual `npm run cf:deploy` needed.
@@ -187,13 +219,16 @@ workflow — no manual `npm run cf:deploy` needed.
 ## Architecture notes
 
 - **Auth**: Google sign-in only (no password) via Google Identity Services,
-  restricted to `GOOGLE_ALLOWED_EMAIL`. The verified Google token creates a
-  cookie-based session (`iron-session`). No multi-tenancy — this app is meant
-  to be deployed for one person.
+  restricted to `GOOGLE_ALLOWED_EMAIL` and, optionally,
+  `GOOGLE_ALLOWED_EMAIL_EMILY`. The verified Google token creates a
+  cookie-based session (`iron-session`) tagged with which household member
+  (`owner`) signed in. Built for exactly two household members, not general
+  multi-tenancy — see "Multi-user" above.
 - **Data model**: `migrations/0001_init.sql` onward. Accounts carry both a Plaid
   `type`/`subtype` (when linked) and an `asset_class` (cash, brokerage,
   retirement, crypto, real_estate, hard_asset, liabilities, other) used for the
-  net-worth-by-category chart.
+  net-worth-by-category chart, plus an `owner` (`brian`/`emily`, see
+  `src/lib/owners.ts`) used for the net-worth owner filter.
 - **Categorization**: transactions get a category from Plaid's
   `personal_finance_category`, mapped in `src/lib/categorize.ts`, or from
   user-defined rules (`category_rule` table) checked first. Manually recategorizing

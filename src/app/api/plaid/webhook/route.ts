@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 import { syncPlaidItem } from "@/lib/sync";
+import type { Owner } from "@/lib/owners";
 
 export async function POST(request: Request) {
   const payload = await request.json().catch(() => null);
@@ -19,9 +20,9 @@ export async function POST(request: Request) {
 
   if (webhookType === "TRANSACTIONS" && webhookCode === "SYNC_UPDATES_AVAILABLE" && plaidItemId) {
     const item = await db
-      .prepare("SELECT id, access_token, cursor FROM plaid_item WHERE plaid_item_id = ?")
+      .prepare("SELECT id, access_token, cursor, owner FROM plaid_item WHERE plaid_item_id = ?")
       .bind(plaidItemId)
-      .first<{ id: string; access_token: string; cursor: string | null }>();
+      .first<{ id: string; access_token: string; cursor: string | null; owner: Owner }>();
     if (item) {
       await syncPlaidItem(db, item);
       await invalidateCache(

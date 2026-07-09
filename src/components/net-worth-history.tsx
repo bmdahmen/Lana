@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import clsx from "clsx";
 import { NetWorthByClassChart } from "@/components/net-worth-by-class-chart";
 import { NET_WORTH_DISPLAY_CLASSES } from "@/lib/asset-classes";
+import { OWNERS, type Owner } from "@/lib/owners";
 import { formatCurrency, formatDate } from "@/lib/format";
 import {
   HISTORY_RANGES,
@@ -13,6 +14,13 @@ import {
 
 const NET_WORTH_KEY = "net_worth";
 
+type OwnerFilter = Owner | "family";
+
+const OWNER_FILTERS: { id: OwnerFilter; label: string }[] = [
+  { id: "family", label: "Family" },
+  ...OWNERS.map((o) => ({ id: o.id as OwnerFilter, label: o.label })),
+];
+
 export function NetWorthHistory({
   initialPoints,
   initialDays,
@@ -21,15 +29,31 @@ export function NetWorthHistory({
   initialDays: number;
 }) {
   const [days, setDays] = useState(initialDays);
+  const [owner, setOwner] = useState<OwnerFilter>("family");
   const [scrubPoint, setScrubPoint] = useState<NetWorthByClassPoint | null>(null);
   // null means "everything visible" (the default); once the user toggles
   // anything, this becomes the explicit set of visible line keys.
   const [selectionOverride, setSelectionOverride] = useState<Set<string> | null>(null);
 
-  const points = useMemo(
+  const slicedPoints = useMemo(
     () => sliceNetWorthPointsByDays(initialPoints, days),
     [initialPoints, days]
   );
+
+  // Owner filtering swaps each class (and the net-worth total) for its
+  // owner-scoped value computed server-side (see queries.ts's ownerKey) --
+  // everything downstream keeps reading the plain class/net_worth fields
+  // and doesn't need to know owner filtering happened at all.
+  const points = useMemo<NetWorthByClassPoint[]>(() => {
+    if (owner === "family") return slicedPoints;
+    return slicedPoints.map((p): NetWorthByClassPoint => {
+      const next: NetWorthByClassPoint = { ...p, net_worth: Number(p[`net_worth:${owner}`] ?? 0) };
+      for (const cls of NET_WORTH_DISPLAY_CLASSES) {
+        next[cls.id] = Number(p[`${cls.id}:${owner}`] ?? 0);
+      }
+      return next;
+    });
+  }, [slicedPoints, owner]);
 
   const availableClasses = useMemo(
     () => NET_WORTH_DISPLAY_CLASSES.filter((cls) => points.some((p) => Number(p[cls.id] ?? 0) !== 0)),
@@ -91,6 +115,22 @@ export function NetWorthHistory({
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex gap-1">
+        {OWNER_FILTERS.map((o) => (
+          <button
+            key={o.id}
+            onClick={() => setOwner(o.id)}
+            className={clsx(
+              "flex-1 rounded-full py-1.5 text-xs font-semibold transition-colors sm:flex-none sm:px-4",
+              owner === o.id
+                ? "bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900"
+                : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"
+            )}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
       <div className="flex gap-1">
         {HISTORY_RANGES.map((r) => (
           <button

@@ -4,11 +4,13 @@ import { newId } from "@/lib/db";
 import { recomputeSpotPriceAccountBalances } from "@/lib/spot-price";
 import { recomputeRealEstateAccountBalances } from "@/lib/zillow";
 import { refreshNetWorthSeriesCache } from "@/lib/queries";
+import type { Owner } from "@/lib/owners";
 
 interface PlaidItemRow {
   id: string;
   access_token: string;
   cursor: string | null;
+  owner: Owner;
 }
 
 const RECOMPUTE_THROTTLE_MS = 4 * 60 * 60 * 1000;
@@ -41,7 +43,7 @@ async function markRecomputed(db: D1Database): Promise<void> {
  */
 export async function syncAllPlaidItems(db: D1Database): Promise<void> {
   const items = await db
-    .prepare("SELECT id, access_token, cursor FROM plaid_item WHERE status = 'good'")
+    .prepare("SELECT id, access_token, cursor, owner FROM plaid_item WHERE status = 'good'")
     .all<PlaidItemRow>();
 
   for (const item of items.results ?? []) {
@@ -101,7 +103,7 @@ export async function syncInvestmentTransactions(db: D1Database, item: PlaidItem
   );
   if (accountByPlaidId.size === 0) return;
 
-  const plaid = getPlaidClient();
+  const plaid = getPlaidClient(item.owner);
   const today = new Date().toISOString().slice(0, 10);
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - INVESTMENT_TRANSACTIONS_LOOKBACK_DAYS);
@@ -257,7 +259,7 @@ export async function syncInvestmentTransactions(db: D1Database, item: PlaidItem
 }
 
 export async function syncPlaidItem(db: D1Database, item: PlaidItemRow): Promise<void> {
-  const plaid = getPlaidClient();
+  const plaid = getPlaidClient(item.owner);
 
   let cursor = item.cursor ?? undefined;
   let hasMore = true;

@@ -1,10 +1,14 @@
 import { getDB } from "@/lib/db";
 import { getCached, CACHE_KEYS } from "@/lib/cache";
+import { getSession } from "@/lib/session";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { ASSET_CLASSES, type AssetClass, type PreciousMetal, type Cryptocurrency } from "@/lib/asset-classes";
+import type { Owner } from "@/lib/owners";
 import { AddManualAccountButton } from "@/components/add-manual-account-button";
 import { AccountRowActions } from "@/components/account-row-actions";
 import { AccountCategorySelect } from "@/components/account-category-select";
+import { AccountOwnerSelect } from "@/components/account-owner-select";
+import { OwnerBadge } from "@/components/owner-badge";
 import { LinkAccountButton } from "@/components/link-account-button";
 import { ImportCsvButton } from "@/components/import-csv-button";
 import { EnableInvestmentsButton } from "@/components/enable-investments-button";
@@ -20,6 +24,7 @@ interface AccountRow {
   is_manual: number;
   is_hidden: number;
   asset_class: AssetClass;
+  owner: Owner;
   institution_name: string | null;
   item_status: string | null;
   precious_metal: PreciousMetal | null;
@@ -62,11 +67,13 @@ function groupAccounts(accounts: AccountRow[]): AccountGroup[] {
 
 export default async function AccountsPage() {
   const db = await getDB();
+  const session = await getSession();
+  const defaultOwner: Owner = session.owner ?? "brian";
   const accounts = await getCached(CACHE_KEYS.accountsList, async () => {
     const result = await db
       .prepare(
         `SELECT a.id, a.name, a.official_name, a.mask, a.current_balance, a.is_manual, a.is_hidden,
-                a.asset_class, p.institution_name, p.status as item_status,
+                a.asset_class, a.owner, p.institution_name, p.status as item_status,
                 a.precious_metal, a.metal_troy_oz, a.crypto_symbol, a.crypto_amount,
                 a.relevant_from, a.relevant_until, a.property_address,
                 EXISTS(SELECT 1 FROM investment_transaction it WHERE it.account_id = a.id) as has_investment_activity
@@ -86,8 +93,8 @@ export default async function AccountsPage() {
       <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Accounts</h1>
 
       <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
-        <LinkAccountButton />
-        <AddManualAccountButton />
+        <LinkAccountButton defaultOwner={defaultOwner} />
+        <AddManualAccountButton defaultOwner={defaultOwner} />
         <ImportCsvButton accounts={accounts.map((a) => ({ id: a.id, name: a.name }))} />
       </div>
 
@@ -121,7 +128,8 @@ export default async function AccountsPage() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                        <p className="flex items-center gap-1.5 truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                          <OwnerBadge owner={acc.owner} />
                           {acc.name}
                           {acc.mask && <span className="text-zinc-400"> •••• {acc.mask}</span>}
                         </p>
@@ -134,7 +142,10 @@ export default async function AccountsPage() {
                       </p>
                     </div>
                     <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
-                      <AccountCategorySelect accountId={acc.id} assetClass={acc.asset_class} />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <AccountCategorySelect accountId={acc.id} assetClass={acc.asset_class} />
+                        <AccountOwnerSelect accountId={acc.id} owner={acc.owner} />
+                      </div>
                       <AccountRowActions
                         accountId={acc.id}
                         isHidden={!!acc.is_hidden}
@@ -161,7 +172,8 @@ export default async function AccountsPage() {
                     {group.accounts.map((acc) => (
                       <tr key={acc.id} className={acc.is_hidden ? "opacity-50" : undefined}>
                         <td className="px-4 py-2.5">
-                          <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                          <p className="flex items-center gap-1.5 font-medium text-zinc-900 dark:text-zinc-50">
+                            <OwnerBadge owner={acc.owner} />
                             {acc.name}
                             {acc.mask && <span className="text-zinc-400"> •••• {acc.mask}</span>}
                           </p>
@@ -173,7 +185,10 @@ export default async function AccountsPage() {
                           )}
                         </td>
                         <td className="px-4 py-2.5">
-                          <AccountCategorySelect accountId={acc.id} assetClass={acc.asset_class} />
+                          <div className="flex flex-wrap items-center gap-2">
+                            <AccountCategorySelect accountId={acc.id} assetClass={acc.asset_class} />
+                            <AccountOwnerSelect accountId={acc.id} owner={acc.owner} />
+                          </div>
                         </td>
                         <td className="px-4 py-2.5 text-right font-medium text-zinc-900 dark:text-zinc-50">
                           {formatCurrency(acc.current_balance ?? 0)}

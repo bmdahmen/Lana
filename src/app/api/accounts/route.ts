@@ -41,6 +41,7 @@ const createSchema = z
     cryptoSymbol: z.enum(CRYPTOCURRENCIES).optional(),
     cryptoAmount: z.number().positive().optional(),
     propertyAddress: z.string().min(1).optional(),
+    owner: z.enum(["brian", "emily"]).default("brian"),
   })
   .refine(
     (data) => {
@@ -91,8 +92,8 @@ export async function POST(request: Request) {
     .prepare(
       `INSERT INTO account (
          id, name, type, current_balance, is_manual, is_asset, asset_class,
-         precious_metal, metal_troy_oz, crypto_symbol, crypto_amount, property_address, zestimate_updated_at
-       ) VALUES (?, ?, 'other', ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`
+         precious_metal, metal_troy_oz, crypto_symbol, crypto_amount, property_address, zestimate_updated_at, owner
+       ) VALUES (?, ?, 'other', ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       id,
@@ -105,7 +106,8 @@ export async function POST(request: Request) {
       body.data.cryptoSymbol ?? null,
       body.data.cryptoAmount ?? null,
       body.data.propertyAddress ?? null,
-      zestimateUpdatedAt
+      zestimateUpdatedAt,
+      body.data.owner
     )
     .run();
 

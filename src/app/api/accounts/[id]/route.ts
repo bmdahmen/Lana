@@ -29,6 +29,7 @@ const updateSchema = z.object({
       "other",
     ])
     .optional(),
+  owner: z.enum(["brian", "emily"]).optional(),
 });
 
 export async function PATCH(
@@ -105,6 +106,10 @@ export async function PATCH(
   if (body.data.assetClass !== undefined) {
     updates.push("asset_class = ?", "is_asset = ?");
     bindings.push(body.data.assetClass, isAssetClassLiability(body.data.assetClass) ? 0 : 1);
+  }
+  if (body.data.owner !== undefined) {
+    updates.push("owner = ?");
+    bindings.push(body.data.owner);
   }
   if (body.data.relevantFrom !== undefined) {
     updates.push("relevant_from = ?");
