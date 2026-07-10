@@ -90,7 +90,7 @@ export function GsrChart() {
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={160}>
-          <LineChart data={sliced} margin={{ left: -16, right: 8 }}>
+          <LineChart data={sliced} margin={{ left: 0, right: 8 }}>
             <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
             <XAxis
               dataKey="date"
@@ -102,7 +102,7 @@ export function GsrChart() {
             <YAxis
               tickFormatter={(v: number) => v.toFixed(0)}
               tick={{ fontSize: 10, fill: "var(--chart-axis)" }}
-              width={32}
+              width={30}
               stroke="var(--chart-axis)"
               domain={["auto", "auto"]}
             />
