@@ -11,6 +11,7 @@ import {
   type MetalValuePoint,
 } from "@/lib/metal-items";
 import { MetalValueChart } from "@/components/metal-value-chart";
+import { SpotPriceChart } from "@/components/spot-price-chart";
 import { AddMetalItemButton } from "@/components/metal-item-modal";
 import { MetalItemsList } from "@/components/metal-items-list";
 
@@ -36,6 +37,7 @@ export function PreciousMetalsDashboard({
   const [metalFilter, setMetalFilter] = useState<PreciousMetal | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<MetalItemCategory | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [expandedSpot, setExpandedSpot] = useState<PreciousMetal | null>(null);
   const holdingsRef = useRef<HTMLDivElement | null>(null);
 
   // Clicking a category bar in the Gold/Silver cards filters the Holdings
@@ -55,18 +57,35 @@ export function PreciousMetalsDashboard({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-950">
-        <span className="flex items-center gap-1.5 text-xs text-zinc-500">
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: "var(--chart-gold)" }} />
-          Gold <span className="font-semibold text-zinc-900 dark:text-zinc-50">{formatCurrency(spotPrices.gold)}</span>
-        </span>
-        <span className="flex items-center gap-1.5 text-xs text-zinc-500">
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: "var(--chart-silver)" }} />
-          Silver <span className="font-semibold text-zinc-900 dark:text-zinc-50">{formatCurrency(spotPrices.silver)}</span>
-        </span>
-        <span className="text-xs text-zinc-500">
-          GSR <span className="font-semibold text-zinc-900 dark:text-zinc-50">{ratio.toFixed(1)}</span>
-        </span>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-950">
+          <button
+            type="button"
+            onClick={() => setExpandedSpot(expandedSpot === "gold" ? null : "gold")}
+            aria-pressed={expandedSpot === "gold"}
+            className="flex items-center gap-1.5 text-xs text-zinc-500"
+          >
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: "var(--chart-gold)" }} />
+            Gold <span className="font-semibold text-zinc-900 dark:text-zinc-50">{formatCurrency(spotPrices.gold)}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setExpandedSpot(expandedSpot === "silver" ? null : "silver")}
+            aria-pressed={expandedSpot === "silver"}
+            className="flex items-center gap-1.5 text-xs text-zinc-500"
+          >
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: "var(--chart-silver)" }} />
+            Silver <span className="font-semibold text-zinc-900 dark:text-zinc-50">{formatCurrency(spotPrices.silver)}</span>
+          </button>
+          <span className="text-xs text-zinc-500">
+            GSR <span className="font-semibold text-zinc-900 dark:text-zinc-50">{ratio.toFixed(1)}</span>
+          </span>
+        </div>
+        {expandedSpot && (
+          <div className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950">
+            <SpotPriceChart metal={expandedSpot} />
+          </div>
+        )}
       </div>
 
       <div className="rounded-xl border border-zinc-200 bg-white p-4 sm:p-6 dark:border-zinc-800 dark:bg-zinc-950">

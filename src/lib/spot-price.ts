@@ -4,6 +4,7 @@ import {
   type PreciousMetal,
   type Cryptocurrency,
 } from "@/lib/asset-classes";
+import { newId } from "@/lib/db";
 
 const SPOT_PRICE_MAX_AGE_MS = 60 * 60 * 1000;
 
@@ -112,6 +113,14 @@ export async function recomputeSpotPriceAccountBalances(db: D1Database): Promise
   if (!hasSpotAccounts) return;
 
   const prices = await getSpotPrices(db);
+  const today = new Date().toISOString().slice(0, 10);
+  const upsertHistory = (symbol: PreciousMetal, price: number) =>
+    db
+      .prepare(
+        `INSERT INTO spot_price_history (id, symbol, date, price_usd) VALUES (?, ?, ?, ?)
+         ON CONFLICT(symbol, date) DO UPDATE SET price_usd = excluded.price_usd`
+      )
+      .bind(newId("sph"), symbol, today, price);
 
   await db.batch([
     db
@@ -138,5 +147,19 @@ export async function recomputeSpotPriceAccountBalances(db: D1Database): Promise
          WHERE crypto_symbol = 'eth' AND is_closed = 0`
       )
       .bind(prices.eth),
+    upsertHistory("gold", prices.gold),
+    upsertHistory("silver", prices.silver),
   ]);
+}
+
+/** Daily spot-price history for one precious metal, oldest first. */
+export async function getSpotPriceHistory(
+  db: D1Database,
+  symbol: PreciousMetal
+): Promise<{ date: string; price_usd: number }[]> {
+  const result = await db
+    .prepare("SELECT date, price_usd FROM spot_price_history WHERE symbol = ? ORDER BY date ASC")
+    .bind(symbol)
+    .all<{ date: string; price_usd: number }>();
+  return result.results ?? [];
 }

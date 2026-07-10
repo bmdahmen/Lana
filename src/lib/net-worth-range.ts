@@ -28,15 +28,12 @@ export const HISTORY_RANGES: RangeOption[] = [
 ];
 
 /**
- * Slices a full net-worth series down to a calendar cutoff. History is often
- * monthly-granularity (or sparser), so slicing by index would return the
- * entire series for any range longer than a few data points -- we need an
- * actual date comparison.
+ * Slices a full date-ordered series down to a calendar cutoff. History is
+ * often monthly-granularity (or sparser), so slicing by index would return
+ * the entire series for any range longer than a few data points -- we need
+ * an actual date comparison.
  */
-export function sliceNetWorthPointsByDays(
-  points: NetWorthByClassPoint[],
-  days: number
-): NetWorthByClassPoint[] {
+export function sliceByDays<T extends { date: string }>(points: T[], days: number): T[] {
   if (points.length === 0) return points;
 
   const cutoff = new Date();
@@ -50,4 +47,11 @@ export function sliceNetWorthPointsByDays(
   // delta/percent-change reflects the value as of the start of the range
   // instead of falling back to zero.
   return points.slice(cutoffIndex - 1);
+}
+
+export function sliceNetWorthPointsByDays(
+  points: NetWorthByClassPoint[],
+  days: number
+): NetWorthByClassPoint[] {
+  return sliceByDays(points, days);
 }
