@@ -163,3 +163,17 @@ export async function getSpotPriceHistory(
     .all<{ date: string; price_usd: number }>();
   return result.results ?? [];
 }
+
+/** Daily gold/silver ratio (troy-oz price of gold / troy-oz price of silver), oldest first. */
+export async function getGsrHistory(db: D1Database): Promise<{ date: string; ratio: number }[]> {
+  const result = await db
+    .prepare(
+      `SELECT g.date as date, g.price_usd / s.price_usd as ratio
+       FROM spot_price_history g
+       JOIN spot_price_history s ON s.symbol = 'silver' AND s.date = g.date
+       WHERE g.symbol = 'gold' AND s.price_usd > 0
+       ORDER BY g.date ASC`
+    )
+    .all<{ date: string; ratio: number }>();
+  return result.results ?? [];
+}

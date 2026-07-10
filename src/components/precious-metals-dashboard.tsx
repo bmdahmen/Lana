@@ -12,6 +12,7 @@ import {
 } from "@/lib/metal-items";
 import { MetalValueChart } from "@/components/metal-value-chart";
 import { SpotPriceChart } from "@/components/spot-price-chart";
+import { GsrChart } from "@/components/gsr-chart";
 import { AddMetalItemButton } from "@/components/metal-item-modal";
 import { MetalItemsList } from "@/components/metal-items-list";
 
@@ -37,7 +38,7 @@ export function PreciousMetalsDashboard({
   const [metalFilter, setMetalFilter] = useState<PreciousMetal | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<MetalItemCategory | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [expandedSpot, setExpandedSpot] = useState<PreciousMetal | null>(null);
+  const [expandedSpot, setExpandedSpot] = useState<PreciousMetal | "gsr" | null>(null);
   const holdingsRef = useRef<HTMLDivElement | null>(null);
 
   // Clicking a category bar in the Gold/Silver cards filters the Holdings
@@ -77,13 +78,19 @@ export function PreciousMetalsDashboard({
             <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: "var(--chart-silver)" }} />
             Silver <span className="font-semibold text-zinc-900 dark:text-zinc-50">{formatCurrency(spotPrices.silver)}</span>
           </button>
-          <span className="text-xs text-zinc-500">
+          <button
+            type="button"
+            onClick={() => setExpandedSpot(expandedSpot === "gsr" ? null : "gsr")}
+            aria-pressed={expandedSpot === "gsr"}
+            className="flex items-center gap-1.5 text-xs text-zinc-500"
+          >
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: "var(--chart-gsr)" }} />
             GSR <span className="font-semibold text-zinc-900 dark:text-zinc-50">{ratio.toFixed(1)}</span>
-          </span>
+          </button>
         </div>
         {expandedSpot && (
           <div className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950">
-            <SpotPriceChart metal={expandedSpot} />
+            {expandedSpot === "gsr" ? <GsrChart /> : <SpotPriceChart metal={expandedSpot} />}
           </div>
         )}
       </div>
