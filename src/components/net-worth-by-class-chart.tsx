@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LineChart,
   Line,
@@ -92,6 +92,17 @@ export function NetWorthByClassChart({
     onScrub?.(null);
   }, [onScrub]);
 
+  // History is often monthly-granularity in the past and daily going
+  // forward -- a plain category axis would space every point evenly
+  // regardless of the actual gap between dates, squeezing years of monthly
+  // snapshots into the same width as a few weeks of daily ones. Using a
+  // numeric time scale keyed off each point's real timestamp makes the x
+  // axis honor actual elapsed time.
+  const timedPoints = useMemo(
+    () => points.map((p) => ({ ...p, _ts: new Date(`${p.date}T00:00:00Z`).getTime() })),
+    [points]
+  );
+
   if (points.length < 2) {
     return (
       <div className="flex h-72 items-center justify-center text-sm text-zinc-500">
@@ -114,12 +125,15 @@ export function NetWorthByClassChart({
       onPointerLeave={handleReleased}
     >
       <ResponsiveContainer width="100%" height={280}>
-        <LineChart data={points} margin={{ left: -16, right: 8 }}>
+        <LineChart data={timedPoints} margin={{ left: -16, right: 8 }}>
           {onScrub && <ScrubTracker onScrub={handleScrub} />}
           <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
           <XAxis
-            dataKey="date"
-            tickFormatter={(d: string) => formatDate(d)}
+            dataKey="_ts"
+            type="number"
+            scale="time"
+            domain={["dataMin", "dataMax"]}
+            tickFormatter={(t: number) => formatDate(new Date(t).toISOString().slice(0, 10))}
             tick={{ fontSize: 11, fill: "var(--chart-axis)" }}
             minTickGap={40}
             stroke="var(--chart-axis)"
