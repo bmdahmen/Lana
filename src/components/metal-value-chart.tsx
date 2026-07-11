@@ -30,14 +30,16 @@ function TooltipContent({
 }: {
   active?: boolean;
   payload?: { value: number; dataKey: string }[];
-  label?: string;
+  label?: number;
 }) {
   if (!active || !payload || payload.length === 0) return null;
   const gold = payload.find((p) => p.dataKey === "gold")?.value ?? 0;
   const silver = payload.find((p) => p.dataKey === "silver")?.value ?? 0;
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs shadow-lg">
-      <p className="mb-1 font-medium text-zinc-400">{label ? formatDate(label) : ""}</p>
+      <p className="mb-1 font-medium text-zinc-400">
+        {label ? formatDate(new Date(label).toISOString().slice(0, 10)) : ""}
+      </p>
       <p style={{ color: "var(--chart-gold)" }}>Gold {formatCurrency(gold)}</p>
       <p style={{ color: "var(--chart-silver)" }}>Silver {formatCurrency(silver)}</p>
       <p className="mt-1 font-medium text-zinc-50">Total {formatCurrency(gold + silver)}</p>
@@ -48,6 +50,15 @@ function TooltipContent({
 export function MetalValueChart({ points }: { points: MetalValuePoint[] }) {
   const [days, setDays] = useState(365);
   const sliced = useMemo(() => sliceByDays(points, days), [points, days]);
+  // History is often monthly-granularity in the past and daily going
+  // forward -- a plain category axis would space every point evenly
+  // regardless of the actual gap between dates. A numeric time scale keyed
+  // off each point's real timestamp makes the x axis honor actual elapsed
+  // time (see the same fix on the net worth chart).
+  const timedPoints = useMemo(
+    () => sliced.map((p) => ({ ...p, _ts: new Date(`${p.date}T00:00:00Z`).getTime() })),
+    [sliced]
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -74,11 +85,14 @@ export function MetalValueChart({ points }: { points: MetalValuePoint[] }) {
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={240}>
-          <LineChart data={sliced} margin={{ left: -16, right: 8 }}>
+          <LineChart data={timedPoints} margin={{ left: -16, right: 8 }}>
             <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
             <XAxis
-              dataKey="date"
-              tickFormatter={(d: string) => formatDate(d)}
+              dataKey="_ts"
+              type="number"
+              scale="time"
+              domain={["dataMin", "dataMax"]}
+              tickFormatter={(t: number) => formatDate(new Date(t).toISOString().slice(0, 10))}
               tick={{ fontSize: 11, fill: "var(--chart-axis)" }}
               minTickGap={40}
               stroke="var(--chart-axis)"
