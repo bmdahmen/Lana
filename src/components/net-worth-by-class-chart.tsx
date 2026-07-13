@@ -123,6 +123,7 @@ export function NetWorthByClassChart({
       onTouchCancel={handleTouchEnded}
       onPointerUp={handleReleased}
       onPointerLeave={handleReleased}
+      className="select-none touch-none [-webkit-touch-callout:none]"
     >
       <ResponsiveContainer width="100%" height={280}>
         <LineChart data={timedPoints} margin={{ left: -16, right: 8 }}>

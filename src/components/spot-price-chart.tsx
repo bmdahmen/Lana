@@ -92,35 +92,37 @@ export function SpotPriceChart({ metal }: { metal: PreciousMetal }) {
           Not enough history yet -- check back after a few days.
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={160}>
-          <LineChart data={sliced} margin={{ left: -16, right: 8 }}>
-            <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
-            <XAxis
-              dataKey="date"
-              tickFormatter={(d: string) => formatDate(d)}
-              tick={{ fontSize: 10, fill: "var(--chart-axis)" }}
-              minTickGap={40}
-              stroke="var(--chart-axis)"
-            />
-            <YAxis
-              tickFormatter={(v: number) => formatCompactCurrency(v)}
-              tick={{ fontSize: 10, fill: "var(--chart-axis)" }}
-              width={42}
-              stroke="var(--chart-axis)"
-              domain={["auto", "auto"]}
-            />
-            <Tooltip content={<TooltipContent />} cursor={{ stroke: "var(--chart-axis)", strokeWidth: 1 }} />
-            <Line
-              type="monotone"
-              dataKey="price_usd"
-              stroke={`var(--chart-${metal})`}
-              strokeWidth={2}
-              dot={false}
-              isAnimationActive={false}
-              activeDot={{ r: 3 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        <div className="select-none touch-none [-webkit-touch-callout:none]">
+          <ResponsiveContainer width="100%" height={160}>
+            <LineChart data={sliced} margin={{ left: -16, right: 8 }}>
+              <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
+              <XAxis
+                dataKey="date"
+                tickFormatter={(d: string) => formatDate(d)}
+                tick={{ fontSize: 10, fill: "var(--chart-axis)" }}
+                minTickGap={40}
+                stroke="var(--chart-axis)"
+              />
+              <YAxis
+                tickFormatter={(v: number) => formatCompactCurrency(v)}
+                tick={{ fontSize: 10, fill: "var(--chart-axis)" }}
+                width={42}
+                stroke="var(--chart-axis)"
+                domain={["auto", "auto"]}
+              />
+              <Tooltip content={<TooltipContent />} cursor={{ stroke: "var(--chart-axis)", strokeWidth: 1 }} />
+              <Line
+                type="monotone"
+                dataKey="price_usd"
+                stroke={`var(--chart-${metal})`}
+                strokeWidth={2}
+                dot={false}
+                isAnimationActive={false}
+                activeDot={{ r: 3 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       )}
 
       <div className="flex justify-between gap-1">

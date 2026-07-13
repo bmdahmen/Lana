@@ -84,46 +84,48 @@ export function MetalValueChart({ points }: { points: MetalValuePoint[] }) {
           Not enough history yet — check back after a few days.
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={240}>
-          <LineChart data={timedPoints} margin={{ left: -16, right: 8 }}>
-            <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
-            <XAxis
-              dataKey="_ts"
-              type="number"
-              scale="time"
-              domain={["dataMin", "dataMax"]}
-              tickFormatter={(t: number) => formatDate(new Date(t).toISOString().slice(0, 10))}
-              tick={{ fontSize: 11, fill: "var(--chart-axis)" }}
-              minTickGap={40}
-              stroke="var(--chart-axis)"
-            />
-            <YAxis
-              tickFormatter={(v: number) => formatCompactCurrency(v)}
-              tick={{ fontSize: 11, fill: "var(--chart-axis)" }}
-              width={48}
-              stroke="var(--chart-axis)"
-            />
-            <Tooltip content={<TooltipContent />} cursor={{ stroke: "var(--chart-axis)", strokeWidth: 1 }} />
-            <Line
-              type="monotone"
-              dataKey="gold"
-              name="Gold"
-              stroke="var(--chart-gold)"
-              strokeWidth={2}
-              dot={false}
-              isAnimationActive={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="silver"
-              name="Silver"
-              stroke="var(--chart-silver)"
-              strokeWidth={2}
-              dot={false}
-              isAnimationActive={false}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        <div className="select-none touch-none [-webkit-touch-callout:none]">
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={timedPoints} margin={{ left: -16, right: 8 }}>
+              <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" />
+              <XAxis
+                dataKey="_ts"
+                type="number"
+                scale="time"
+                domain={["dataMin", "dataMax"]}
+                tickFormatter={(t: number) => formatDate(new Date(t).toISOString().slice(0, 10))}
+                tick={{ fontSize: 11, fill: "var(--chart-axis)" }}
+                minTickGap={40}
+                stroke="var(--chart-axis)"
+              />
+              <YAxis
+                tickFormatter={(v: number) => formatCompactCurrency(v)}
+                tick={{ fontSize: 11, fill: "var(--chart-axis)" }}
+                width={48}
+                stroke="var(--chart-axis)"
+              />
+              <Tooltip content={<TooltipContent />} cursor={{ stroke: "var(--chart-axis)", strokeWidth: 1 }} />
+              <Line
+                type="monotone"
+                dataKey="gold"
+                name="Gold"
+                stroke="var(--chart-gold)"
+                strokeWidth={2}
+                dot={false}
+                isAnimationActive={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="silver"
+                name="Silver"
+                stroke="var(--chart-silver)"
+                strokeWidth={2}
+                dot={false}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       )}
     </div>
   );
