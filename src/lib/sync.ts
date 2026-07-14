@@ -71,7 +71,23 @@ export async function recomputeAccountBalances(
   if (!options?.force && !(await isRecomputeStale(db))) return;
 
   await syncAllPlaidItems(db);
-  await Promise.all([recomputeSpotPriceAccountBalances(db), recomputeRealEstateAccountBalances(db)]);
+
+  // Best-effort, same as syncAllPlaidItems above: a spot-price fetch or
+  // Zillow outage shouldn't take the whole daily snapshot down with it --
+  // Promise.all would otherwise fail fast on the first rejection and skip
+  // recomputeNetWorth entirely, silently dropping that day's balance-history
+  // (and spot-price-history) row even though nothing was actually wrong with
+  // the accounts those two functions don't touch.
+  const results = await Promise.allSettled([
+    recomputeSpotPriceAccountBalances(db),
+    recomputeRealEstateAccountBalances(db),
+  ]);
+  for (const result of results) {
+    if (result.status === "rejected") {
+      console.error("Balance recompute step failed", result.reason);
+    }
+  }
+
   await recomputeNetWorth(db, { force: true });
 }
 
