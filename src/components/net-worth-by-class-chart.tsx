@@ -13,8 +13,24 @@ import {
   useActiveTooltipDataPoints,
 } from "recharts";
 import { NET_WORTH_DISPLAY_CLASSES } from "@/lib/asset-classes";
-import { formatCompactCurrency, formatDate } from "@/lib/format";
+import { formatCompactCurrency } from "@/lib/format";
 import type { NetWorthByClassPoint } from "@/lib/net-worth-range";
+
+const MS_PER_DAY = 86_400_000;
+/** Above this span, per-tick month/day would repeat the same handful of
+ *  years many times over with no useful detail -- just labeling the year is
+ *  clearer than "May 30, 2024" next to "Aug 12, 2024". */
+const YEAR_ONLY_SPAN_DAYS = 500;
+
+function xAxisTickFormatter(spanDays: number) {
+  return (t: number) => {
+    const d = new Date(t);
+    if (spanDays > YEAR_ONLY_SPAN_DAYS) {
+      return d.toLocaleDateString("en-US", { year: "numeric", timeZone: "UTC" });
+    }
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+  };
+}
 
 /**
  * Renders nothing -- it just mirrors recharts' internal hover/scrub state
@@ -117,6 +133,8 @@ export function NetWorthByClassChart({
   );
   const showNetWorth = !visibleKeys || visibleKeys.has("net_worth");
 
+  const spanDays = (timedPoints[timedPoints.length - 1]._ts - timedPoints[0]._ts) / MS_PER_DAY;
+
   return (
     <div
       onTouchEnd={handleTouchEnded}
@@ -134,12 +152,13 @@ export function NetWorthByClassChart({
             type="number"
             scale="time"
             domain={["dataMin", "dataMax"]}
-            tickFormatter={(t: number) => formatDate(new Date(t).toISOString().slice(0, 10))}
+            tickFormatter={xAxisTickFormatter(spanDays)}
             tick={{ fontSize: 11, fill: "var(--chart-axis)" }}
             minTickGap={40}
             stroke="var(--chart-axis)"
           />
           <YAxis
+            domain={[0, "auto"]}
             tickFormatter={(v: number) => formatCompactCurrency(v)}
             tick={{ fontSize: 11, fill: "var(--chart-axis)" }}
             width={48}
