@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getDB } from "@/lib/db";
 import { getNetWorthSeries, type NetWorthByClassPoint } from "@/lib/queries";
 import { type AssetClass } from "@/lib/asset-classes";
+import type { Owner } from "@/lib/owners";
 import { HOME_RANGES } from "@/lib/net-worth-range";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { NetWorthDashboard } from "@/components/net-worth-dashboard";
@@ -27,6 +28,7 @@ interface AccountSummaryRow {
   current_balance: number | null;
   mask: string | null;
   updated_at: string;
+  owner: Owner;
 }
 
 interface DashboardData {
@@ -62,7 +64,7 @@ export default async function DashboardPage() {
           .all<RecentTransaction>(),
         db
           .prepare(
-            `SELECT id, name, asset_class, current_balance, mask, updated_at FROM account
+            `SELECT id, name, asset_class, current_balance, mask, updated_at, owner FROM account
              WHERE is_closed = 0 AND is_hidden = 0
                AND (relevant_until IS NULL OR relevant_until >= ?)
              ORDER BY current_balance DESC`

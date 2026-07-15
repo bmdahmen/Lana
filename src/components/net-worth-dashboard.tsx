@@ -28,6 +28,7 @@ interface AccountSummary {
   current_balance: number | null;
   mask: string | null;
   updated_at: string;
+  owner: Owner;
 }
 
 export function NetWorthDashboard({
@@ -73,24 +74,19 @@ export function NetWorthDashboard({
   const trendColor = isUp ? "var(--positive)" : "var(--negative)";
   const rangeLabel = HOME_RANGES.find((r) => r.days === days)?.label ?? "";
 
-  // Always family-wide, regardless of the owner toggle above -- the account
-  // list below it isn't owner-scoped (it links out to /net-worth for that),
-  // so filtering just this total would make the tiles and the list disagree.
-  // scrubPoint itself may hold owner-remapped values when a filter is
-  // active, so look up the real family point for that date instead of using
-  // it directly.
-  const familyScrubPoint = scrubPoint
-    ? (slicedPoints.find((p) => p.date === scrubPoint.date) ?? null)
-    : null;
-  const familyDisplayPoint = familyScrubPoint ?? slicedPoints[slicedPoints.length - 1];
-  const classBreakdown = familyDisplayPoint
-    ? NET_WORTH_DISPLAY_CLASSES.filter((cls) => Number(familyDisplayPoint[cls.id] ?? 0) !== 0)
+  // Scoped to the same owner as the toggle above -- displayPoint already
+  // carries owner-remapped class values, so this just reads them straight
+  // through. The account list below is filtered to match (scopedAccounts),
+  // so the tiles and the list always agree.
+  const classBreakdown = displayPoint
+    ? NET_WORTH_DISPLAY_CLASSES.filter((cls) => Number(displayPoint[cls.id] ?? 0) !== 0)
         .map((cls) => ({
           ...cls,
-          value: Number(familyDisplayPoint[cls.id] ?? 0),
+          value: Number(displayPoint[cls.id] ?? 0),
         }))
         .sort((a, b) => b.value - a.value)
     : [];
+  const scopedAccounts = owner === "family" ? accounts : accounts.filter((a) => a.owner === owner);
 
   return (
     <div className="flex flex-col">
@@ -175,7 +171,7 @@ export function NetWorthDashboard({
               Explore by account →
             </Link>
           </div>
-          <CategoryBreakdown classes={classBreakdown} accounts={accounts} />
+          <CategoryBreakdown classes={classBreakdown} accounts={scopedAccounts} />
         </section>
       )}
     </div>

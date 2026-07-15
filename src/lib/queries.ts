@@ -89,7 +89,6 @@ async function computeNetWorthSeries(db: D1Database): Promise<NetWorthByClassPoi
   const byDate = new Map<string, Record<string, number>>();
   for (const row of result.results ?? []) {
     const bucket = byDate.get(row.date) ?? {};
-    bucket[row.asset_class] = (bucket[row.asset_class] ?? 0) + row.total;
     bucket[ownerKey(row.asset_class, row.owner)] = row.total;
     byDate.set(row.date, bucket);
   }
@@ -104,16 +103,20 @@ async function computeNetWorthSeries(db: D1Database): Promise<NetWorthByClassPoi
     const netWorthByOwner: Record<Owner, number> = { brian: 0, emily: 0 };
 
     for (const { id } of ASSET_CLASSES) {
-      // Carry forward the last known total when a class has no row for this
-      // date (e.g. its account stopped syncing) instead of dropping to zero
-      // -- unless every contributing account for this class has expired as
-      // of this date, in which case the value should actually be gone.
+      // Carry forward the last known total when an owner has no row for this
+      // date (e.g. their account stopped syncing, or their history is only
+      // sparse/monthly) instead of dropping to zero -- unless every
+      // contributing account for this class has expired as of this date, in
+      // which case the value should actually be gone. The class-level total
+      // is always the sum of each owner's (independently carried-forward)
+      // value, never read straight from the SQL-grouped row -- two owners
+      // rarely have a balance row on the exact same date (e.g. one owner's
+      // history is biweekly on different days than the other's), so a date
+      // with only one owner's row would otherwise undercount the class by
+      // dropping the other owner's carried-forward contribution entirely.
       const expiry = classExpiry.get(id);
       const expired = expiry != null && date > expiry;
-      const value = bucket[id] ?? (expired ? 0 : lastKnown[id] ?? 0);
-      lastKnown[id] = value;
-      point[id] = value;
-      netWorth += id === "liabilities" ? -value : value;
+      let value = 0;
 
       for (const { id: owner } of OWNERS) {
         const key = ownerKey(id, owner);
@@ -121,7 +124,11 @@ async function computeNetWorthSeries(db: D1Database): Promise<NetWorthByClassPoi
         lastKnown[key] = ownerValue;
         point[key] = ownerValue;
         netWorthByOwner[owner] += id === "liabilities" ? -ownerValue : ownerValue;
+        value += ownerValue;
       }
+
+      point[id] = value;
+      netWorth += id === "liabilities" ? -value : value;
     }
     point.net_worth = netWorth;
     for (const { id: owner } of OWNERS) {
