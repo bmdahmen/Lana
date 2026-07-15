@@ -116,13 +116,18 @@ export function AccountRowActions({
               patch({ relevantUntil: null, relevantFrom: null });
               return;
             }
-            if (
-              confirm(
-                "Mark historical? Its balance history stays in the net worth chart, but it stops counting toward today's totals -- use this instead of Close when a real linked account now covers the same category."
-              )
-            ) {
-              patch({ relevantUntil: new Date().toISOString().slice(0, 10) });
+            const today = new Date().toISOString().slice(0, 10);
+            const value = prompt(
+              "Mark historical as of what date? Its balance history stays in the net worth chart, but it stops counting toward totals from this date on -- use this instead of Close when a real linked account now covers the same category.",
+              today
+            );
+            if (value === null) return;
+            const trimmed = value.trim();
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+              alert("Enter a date as YYYY-MM-DD");
+              return;
             }
+            patch({ relevantUntil: trimmed });
           }}
           className="text-zinc-500 hover:text-zinc-900 disabled:opacity-50 dark:hover:text-zinc-50"
         >
