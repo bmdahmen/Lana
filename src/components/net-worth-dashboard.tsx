@@ -6,12 +6,20 @@ import clsx from "clsx";
 import { NetWorthByClassChart } from "@/components/net-worth-by-class-chart";
 import { CategoryBreakdown } from "@/components/category-breakdown";
 import { NET_WORTH_DISPLAY_CLASSES, type AssetClass } from "@/lib/asset-classes";
+import { OWNERS, type Owner } from "@/lib/owners";
 import { formatCurrency, formatDate } from "@/lib/format";
 import {
   HOME_RANGES,
   sliceNetWorthPointsByDays,
   type NetWorthByClassPoint,
 } from "@/lib/net-worth-range";
+
+type OwnerFilter = Owner | "family";
+
+const OWNER_FILTERS: { id: OwnerFilter; label: string }[] = [
+  { id: "family", label: "Family" },
+  ...OWNERS.map((o) => ({ id: o.id as OwnerFilter, label: o.label })),
+];
 
 interface AccountSummary {
   id: string;
@@ -32,12 +40,28 @@ export function NetWorthDashboard({
   accounts: AccountSummary[];
 }) {
   const [days, setDays] = useState(initialDays);
+  const [owner, setOwner] = useState<OwnerFilter>("family");
   const [scrubPoint, setScrubPoint] = useState<NetWorthByClassPoint | null>(null);
 
-  const points = useMemo(
+  const slicedPoints = useMemo(
     () => sliceNetWorthPointsByDays(initialPoints, days),
     [initialPoints, days]
   );
+
+  // Same owner-remap as the /net-worth exploration page: swap each point's
+  // net_worth and class fields for that owner's scoped value, so the hero
+  // number, delta, and chart all just read the plain fields without needing
+  // to know owner filtering happened.
+  const points = useMemo<NetWorthByClassPoint[]>(() => {
+    if (owner === "family") return slicedPoints;
+    return slicedPoints.map((p): NetWorthByClassPoint => {
+      const next: NetWorthByClassPoint = { ...p, net_worth: Number(p[`net_worth:${owner}`] ?? 0) };
+      for (const cls of NET_WORTH_DISPLAY_CLASSES) {
+        next[cls.id] = Number(p[`${cls.id}:${owner}`] ?? 0);
+      }
+      return next;
+    });
+  }, [slicedPoints, owner]);
 
   const latest = points[points.length - 1];
   const first = points[0];
@@ -49,11 +73,21 @@ export function NetWorthDashboard({
   const trendColor = isUp ? "var(--positive)" : "var(--negative)";
   const rangeLabel = HOME_RANGES.find((r) => r.days === days)?.label ?? "";
 
-  const classBreakdown = displayPoint
-    ? NET_WORTH_DISPLAY_CLASSES.filter((cls) => Number(displayPoint[cls.id] ?? 0) !== 0)
+  // Always family-wide, regardless of the owner toggle above -- the account
+  // list below it isn't owner-scoped (it links out to /net-worth for that),
+  // so filtering just this total would make the tiles and the list disagree.
+  // scrubPoint itself may hold owner-remapped values when a filter is
+  // active, so look up the real family point for that date instead of using
+  // it directly.
+  const familyScrubPoint = scrubPoint
+    ? (slicedPoints.find((p) => p.date === scrubPoint.date) ?? null)
+    : null;
+  const familyDisplayPoint = familyScrubPoint ?? slicedPoints[slicedPoints.length - 1];
+  const classBreakdown = familyDisplayPoint
+    ? NET_WORTH_DISPLAY_CLASSES.filter((cls) => Number(familyDisplayPoint[cls.id] ?? 0) !== 0)
         .map((cls) => ({
           ...cls,
-          value: Number(displayPoint[cls.id] ?? 0),
+          value: Number(familyDisplayPoint[cls.id] ?? 0),
         }))
         .sort((a, b) => b.value - a.value)
     : [];
@@ -84,6 +118,23 @@ export function NetWorthDashboard({
             </div>
           )
         )}
+
+        <div className="mt-4 flex gap-1">
+          {OWNER_FILTERS.map((o) => (
+            <button
+              key={o.id}
+              onClick={() => setOwner(o.id)}
+              className={clsx(
+                "flex-1 rounded-full py-1.5 text-xs font-semibold transition-colors sm:flex-none sm:px-4",
+                owner === o.id
+                  ? "bg-zinc-900 text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900"
+                  : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"
+              )}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
 
         <div className="mt-4">
           {points.length < 2 ? (
