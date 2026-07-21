@@ -73,9 +73,16 @@ interface DatedAmount {
 function splitDateGroup(
   date: string,
   rows: Array<{ type: string; subtype: string; amount: number }>
-): { cashIn: number; cashOut: number; unmatchedBuys: DatedAmount[]; unmatchedSells: DatedAmount[] } {
+): {
+  unmatchedBuys: DatedAmount[];
+  unmatchedSells: DatedAmount[];
+  cashDeposits: DatedAmount[];
+  cashWithdrawals: DatedAmount[];
+} {
   const buys: number[] = [];
   const sells: number[] = [];
+  const cashDepositRows: number[] = [];
+  const cashWithdrawalRows: number[] = [];
   let cashIn = 0;
   let cashOut = 0;
   let cashNeutral = 0;
@@ -87,9 +94,15 @@ function splitDateGroup(
     } else if (row.type === "sell" && (row.subtype === "sell" || row.subtype === "sell short")) {
       sells.push(cents);
     } else if (row.type === "cash") {
-      if (row.subtype === "contribution" || row.subtype === "deposit") cashIn += cents;
-      else if (row.subtype === "withdrawal" || row.subtype === "distribution") cashOut += cents;
-      else if (row.subtype === "dividend" || row.subtype === "interest") cashNeutral += cents;
+      if (row.subtype === "contribution" || row.subtype === "deposit") {
+        cashIn += cents;
+        cashDepositRows.push(cents);
+      } else if (row.subtype === "withdrawal" || row.subtype === "distribution") {
+        cashOut += cents;
+        cashWithdrawalRows.push(cents);
+      } else if (row.subtype === "dividend" || row.subtype === "interest") {
+        cashNeutral += cents;
+      }
     }
   }
 
@@ -99,10 +112,10 @@ function splitDateGroup(
   const sellsAreSwept = sellsTotal > 0 && sellsTotal <= cashOut;
 
   return {
-    cashIn,
-    cashOut,
     unmatchedBuys: buysAreSwept ? [] : buys.map((cents) => ({ date, cents })),
     unmatchedSells: sellsAreSwept ? [] : sells.map((cents) => ({ date, cents })),
+    cashDeposits: cashDepositRows.map((cents) => ({ date, cents })),
+    cashWithdrawals: cashWithdrawalRows.map((cents) => ({ date, cents })),
   };
 }
 
@@ -113,37 +126,41 @@ function daysBetween(a: string, b: string): number {
 }
 
 /**
- * A buy and a sell of the exact same dollar amount within a few days of
- * each other, anywhere in the account, is a fund exchange (e.g. redeeming a
- * money-market sweep fund to buy an ETF) -- money moving between holdings
- * inside the account, not new money contributed or withdrawn. The sell leg
- * can settle a day or two before the matching buy posts, so this isn't
- * limited to same-day pairs the way the cash-vs-buy/sell matching above is.
+ * Matches each `need` amount against a `pool` entry of the exact same
+ * dollar amount within a few days of it (nearest date wins), anywhere in
+ * the account. Used for two distinct fund-exchange shapes: a buy funded by
+ * a sell of a different security, and a buy or sell funded by redeeming or
+ * sweeping a money-market/settlement fund position -- which Plaid reports
+ * as a plain cash withdrawal/deposit, not a sell/buy. Either way it's money
+ * moving between holdings inside the account, not new money contributed or
+ * withdrawn. One leg can settle a day or two before the other posts, so
+ * this isn't limited to same-day pairs the way the cash-vs-buy/sell
+ * same-day sweep check above is.
  */
-function netExchanges(
-  buys: DatedAmount[],
-  sells: DatedAmount[]
-): { unmatchedBuys: DatedAmount[]; unmatchedSells: DatedAmount[] } {
-  const remainingSells = [...sells];
-  const unmatchedBuys: DatedAmount[] = [];
+function netAmounts(
+  need: DatedAmount[],
+  pool: DatedAmount[]
+): { unmatchedNeed: DatedAmount[]; unmatchedPool: DatedAmount[] } {
+  const remainingPool = [...pool];
+  const unmatchedNeed: DatedAmount[] = [];
 
-  for (const buy of buys) {
+  for (const item of need) {
     let bestIdx = -1;
     let bestDiff = Infinity;
-    for (let i = 0; i < remainingSells.length; i++) {
-      const sell = remainingSells[i];
-      if (sell.cents !== buy.cents) continue;
-      const diff = daysBetween(buy.date, sell.date);
+    for (let i = 0; i < remainingPool.length; i++) {
+      const candidate = remainingPool[i];
+      if (candidate.cents !== item.cents) continue;
+      const diff = daysBetween(item.date, candidate.date);
       if (diff <= EXCHANGE_WINDOW_DAYS && diff < bestDiff) {
         bestDiff = diff;
         bestIdx = i;
       }
     }
-    if (bestIdx !== -1) remainingSells.splice(bestIdx, 1);
-    else unmatchedBuys.push(buy);
+    if (bestIdx !== -1) remainingPool.splice(bestIdx, 1);
+    else unmatchedNeed.push(item);
   }
 
-  return { unmatchedBuys, unmatchedSells: remainingSells };
+  return { unmatchedNeed, unmatchedPool: remainingPool };
 }
 
 function netAccountFlows(
@@ -156,25 +173,34 @@ function netAccountFlows(
     byDate.set(row.date, group);
   }
 
-  let cashIn = 0;
-  let cashOut = 0;
   let unmatchedBuys: DatedAmount[] = [];
   let unmatchedSells: DatedAmount[] = [];
+  let cashDeposits: DatedAmount[] = [];
+  let cashWithdrawals: DatedAmount[] = [];
   for (const [date, group] of byDate) {
     const r = splitDateGroup(date, group);
-    cashIn += r.cashIn;
-    cashOut += r.cashOut;
     unmatchedBuys = unmatchedBuys.concat(r.unmatchedBuys);
     unmatchedSells = unmatchedSells.concat(r.unmatchedSells);
+    cashDeposits = cashDeposits.concat(r.cashDeposits);
+    cashWithdrawals = cashWithdrawals.concat(r.cashWithdrawals);
   }
 
-  const { unmatchedBuys: finalBuys, unmatchedSells: finalSells } = netExchanges(unmatchedBuys, unmatchedSells);
+  // Buys vs sells: a sale funding a purchase of a different security.
+  const buysVsSells = netAmounts(unmatchedBuys, unmatchedSells);
+  // Remaining buys vs cash withdrawals: redeeming a money-market/settlement
+  // fund position (reported as a cash withdrawal, not a sell) to fund a
+  // purchase -- e.g. selling money-market shares to buy an investment.
+  const buysVsWithdrawals = netAmounts(buysVsSells.unmatchedNeed, cashWithdrawals);
+  // Remaining sells vs cash deposits: sale proceeds swept into a
+  // money-market/settlement fund position (reported as a cash deposit, not
+  // a buy).
+  const sellsVsDeposits = netAmounts(buysVsSells.unmatchedPool, cashDeposits);
 
   const sum = (values: DatedAmount[]) => values.reduce((a, b) => a + b.cents, 0) / 100;
 
   return {
-    contributions: cashIn / 100 + sum(finalBuys),
-    distributions: cashOut / 100 + sum(finalSells),
+    contributions: sum(buysVsWithdrawals.unmatchedNeed) + sum(sellsVsDeposits.unmatchedPool),
+    distributions: sum(sellsVsDeposits.unmatchedNeed) + sum(buysVsWithdrawals.unmatchedPool),
   };
 }
 
