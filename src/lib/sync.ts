@@ -310,6 +310,13 @@ export async function syncPlaidItem(db: D1Database, item: PlaidItemRow): Promise
     .all<CategoryRule>();
   const rules = rulesResult.results ?? [];
 
+  // Batched rather than one sequential awaited write per transaction -- an
+  // initial sync backfills up to 730 days per account, and hundreds of
+  // individually-awaited round trips in a single request is exactly the kind
+  // of thing that trips Cloudflare's Worker CPU/resource limit (seen as a
+  // 1102 error). D1's practical batch-size comfort zone is a few hundred
+  // statements, so this chunks rather than sending it all in one call.
+  const statements = [];
   for (const tx of [...added, ...modified]) {
     const account = accountByPlaidId.get(tx.account_id);
     if (!account) continue;
@@ -327,47 +334,52 @@ export async function syncPlaidItem(db: D1Database, item: PlaidItemRow): Promise
           tx.personal_finance_category?.detailed
         );
 
-    await db
-      .prepare(
-        `INSERT INTO "transaction" (
-           id, plaid_transaction_id, account_id, amount, iso_currency_code, date,
-           authorized_date, name, merchant_name, category_id, plaid_category,
-           pending, is_manual, category_source
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'auto')
-         ON CONFLICT(plaid_transaction_id) DO UPDATE SET
-           amount = excluded.amount,
-           date = excluded.date,
-           authorized_date = excluded.authorized_date,
-           name = excluded.name,
-           merchant_name = excluded.merchant_name,
-           category_id = CASE WHEN "transaction".category_source = 'manual'
-                          THEN "transaction".category_id ELSE excluded.category_id END,
-           plaid_category = excluded.plaid_category,
-           pending = excluded.pending,
-           updated_at = datetime('now')`
-      )
-      .bind(
-        newId("txn"),
-        tx.transaction_id,
-        accountId,
-        tx.amount,
-        tx.iso_currency_code,
-        tx.date,
-        tx.authorized_date ?? null,
-        tx.name,
-        tx.merchant_name ?? null,
-        categoryId,
-        tx.personal_finance_category?.primary ?? null,
-        tx.pending ? 1 : 0
-      )
-      .run();
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO "transaction" (
+             id, plaid_transaction_id, account_id, amount, iso_currency_code, date,
+             authorized_date, name, merchant_name, category_id, plaid_category,
+             pending, is_manual, category_source
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'auto')
+           ON CONFLICT(plaid_transaction_id) DO UPDATE SET
+             amount = excluded.amount,
+             date = excluded.date,
+             authorized_date = excluded.authorized_date,
+             name = excluded.name,
+             merchant_name = excluded.merchant_name,
+             category_id = CASE WHEN "transaction".category_source = 'manual'
+                            THEN "transaction".category_id ELSE excluded.category_id END,
+             plaid_category = excluded.plaid_category,
+             pending = excluded.pending,
+             updated_at = datetime('now')`
+        )
+        .bind(
+          newId("txn"),
+          tx.transaction_id,
+          accountId,
+          tx.amount,
+          tx.iso_currency_code,
+          tx.date,
+          tx.authorized_date ?? null,
+          tx.name,
+          tx.merchant_name ?? null,
+          categoryId,
+          tx.personal_finance_category?.primary ?? null,
+          tx.pending ? 1 : 0
+        )
+    );
   }
 
   for (const tx of removed) {
-    await db
-      .prepare('DELETE FROM "transaction" WHERE plaid_transaction_id = ?')
-      .bind(tx.transaction_id)
-      .run();
+    statements.push(
+      db.prepare('DELETE FROM "transaction" WHERE plaid_transaction_id = ?').bind(tx.transaction_id)
+    );
+  }
+
+  const BATCH_CHUNK_SIZE = 100;
+  for (let i = 0; i < statements.length; i += BATCH_CHUNK_SIZE) {
+    await db.batch(statements.slice(i, i + BATCH_CHUNK_SIZE));
   }
 
   await db
