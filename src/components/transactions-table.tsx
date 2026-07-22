@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { getCachedFetch, setCachedFetch, invalidateCachedFetch } from "@/lib/client-cache";
 
@@ -87,6 +87,19 @@ export function TransactionsTable({
   // a fresh array literal on every render -- that would otherwise bust the
   // useCallback deps below on every parent re-render.
   const excludeCategoryKey = excludeCategoryIds?.join(",") ?? "";
+  // Each mobile row is its own native horizontal-scroll container (see the
+  // scroll-snap comment below) -- scrolling it left is what "reveals" the
+  // category-edit/create-rule icons. That's DOM scroll state, invisible to
+  // React, so nothing ever closed it back up after an edit: refs let us
+  // snap every row back to its resting position whenever the transaction
+  // list changes (a category edit, a rule reapplying, a fresh load).
+  const rowScrollRefs = useRef(new Map<string, HTMLDivElement | null>());
+
+  useEffect(() => {
+    for (const el of rowScrollRefs.current.values()) {
+      el?.scrollTo({ left: 0 });
+    }
+  }, [transactions]);
 
   const buildParams = useCallback(
     (offset: number) => {
@@ -152,8 +165,19 @@ export function TransactionsTable({
   }
 
   async function updateCategory(id: string, categoryId: string) {
+    const category = categories.find((c) => c.id === categoryId);
     setTransactions((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, category_id: categoryId } : t))
+      prev.map((t) =>
+        t.id === id
+          ? {
+              ...t,
+              category_id: categoryId,
+              category_name: category?.name ?? t.category_name,
+              category_icon: category?.icon ?? t.category_icon,
+              category_source: "manual",
+            }
+          : t
+      )
     );
     invalidateCachedFetch(DEFAULT_TRANSACTIONS_CACHE_KEY);
     await fetch(`/api/transactions/${id}`, {
@@ -386,7 +410,12 @@ export function TransactionsTable({
                 key={tx.id}
                 className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950"
               >
-                <div className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto">
+                <div
+                  ref={(el) => {
+                    rowScrollRefs.current.set(tx.id, el);
+                  }}
+                  className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto"
+                >
                   <button
                     type="button"
                     onClick={() => setDetailId(detailId === tx.id ? null : tx.id)}
