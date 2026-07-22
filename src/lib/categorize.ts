@@ -8,8 +8,8 @@ const PRIMARY_CATEGORY_MAP: Record<string, string> = {
   FOOD_AND_DRINK: "cat_food",
   GENERAL_MERCHANDISE: "cat_shopping",
   HOME_IMPROVEMENT: "cat_housing",
-  MEDICAL: "cat_health",
-  PERSONAL_CARE: "cat_personal",
+  MEDICAL: "cat_shopping",
+  PERSONAL_CARE: "cat_shopping",
   GENERAL_SERVICES: "cat_other",
   GOVERNMENT_AND_NON_PROFIT: "cat_other",
   TRANSPORTATION: "cat_transportation",
@@ -20,7 +20,7 @@ const PRIMARY_CATEGORY_MAP: Record<string, string> = {
 
 const DETAILED_CATEGORY_MAP: Record<string, string> = {
   FOOD_AND_DRINK_GROCERIES: "cat_groceries",
-  GENERAL_SERVICES_EDUCATION: "cat_education",
+  GENERAL_SERVICES_EDUCATION: "cat_entertainment",
   // Credit card payments move money to an account whose individual purchases
   // are already categorized elsewhere, so they aren't spending on their own.
   LOAN_PAYMENTS_CREDIT_CARD_PAYMENT: "cat_transfer",
@@ -55,12 +55,12 @@ const LABEL_CATEGORY_KEYWORDS: Array<[RegExp, string]> = [
   [/utilit|electric|water bill|internet|cable/, "cat_utilities"],
   [/restaurant|dining|coffee|fast food/, "cat_food"],
   [/gas station|fuel|parking|uber|lyft|taxi|transit|transportation/, "cat_transportation"],
-  [/subscription/, "cat_subscriptions"],
+  [/subscription/, "cat_entertainment"],
   [/entertainment|movie|music|streaming|game/, "cat_entertainment"],
-  [/health|medical|pharmacy|doctor|dental/, "cat_health"],
+  [/health|medical|pharmacy|doctor|dental/, "cat_shopping"],
   [/travel|airline|hotel|flight/, "cat_travel"],
-  [/personal care|salon|spa|gym|fitness/, "cat_personal"],
-  [/education|tuition|student loan/, "cat_education"],
+  [/personal care|salon|spa|gym|fitness/, "cat_shopping"],
+  [/education|tuition|student loan/, "cat_entertainment"],
   [/fee|interest charge|service charge/, "cat_fees"],
   [/shopping|merchandise|retail|clothing/, "cat_shopping"],
 ];
