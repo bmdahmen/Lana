@@ -160,7 +160,7 @@ export function SpendingBreakdown({
           excludeCategoryIds={NON_SPENDING_CATEGORY_IDS}
           from={from}
           to={to}
-          defaultSort="amount"
+          defaultSort="recent"
           collapsibleSearch
           hideCategoryDropdown
         />
