@@ -504,6 +504,7 @@ export function QuickEditQuantityFields({
 }) {
   const router = useRouter();
   const [quantity, setQuantity] = useState(String(item.quantity));
+  const [category, setCategory] = useState<MetalItemCategory>(item.category);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -523,7 +524,7 @@ export function QuickEditQuantityFields({
       const res = await fetch(`/api/metal-items/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quantity: qty }),
+        body: JSON.stringify({ quantity: qty, category }),
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -572,6 +573,20 @@ export function QuickEditQuantityFields({
             {estValue !== null && <> ≈ {formatCurrency(estValue)}</>}
           </span>
         </div>
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-zinc-500">Category</label>
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value as MetalItemCategory)}
+          className="w-full rounded-md border border-zinc-300 px-3 py-1.5 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-950"
+        >
+          {METAL_ITEM_CATEGORIES.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.label}
+            </option>
+          ))}
+        </select>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex items-center justify-between gap-2">
