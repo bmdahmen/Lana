@@ -25,9 +25,11 @@ interface Category {
 export function SpendingBreakdown({
   initialBreakdown,
   categories,
+  hideLineItems,
 }: {
   initialBreakdown: BreakdownRow[];
   categories: Category[];
+  hideLineItems?: boolean;
 }) {
   const monthOptions = useMemo(() => buildMonthOptions(MONTHS_BACK), []);
   const [selectedMonth, setSelectedMonth] = useState(0);
@@ -134,37 +136,43 @@ export function SpendingBreakdown({
         )}
       </div>
 
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium text-zinc-500">
-            {activeCategory
-              ? `${activeCategory.category_icon} ${activeCategory.category_name} transactions`
-              : "All transactions"}
-            {" · "}
-            {label}
-          </h2>
-          {activeCategory && (
-            <button
-              type="button"
-              onClick={() => setActiveCategory(null)}
-              className="text-xs font-medium text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
-            >
-              Clear filter
-            </button>
-          )}
+      {hideLineItems ? (
+        <p className="py-4 text-center text-sm text-zinc-500">
+          Transaction line items are hidden in guest view.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium text-zinc-500">
+              {activeCategory
+                ? `${activeCategory.category_icon} ${activeCategory.category_name} transactions`
+                : "All transactions"}
+              {" · "}
+              {label}
+            </h2>
+            {activeCategory && (
+              <button
+                type="button"
+                onClick={() => setActiveCategory(null)}
+                className="text-xs font-medium text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+              >
+                Clear filter
+              </button>
+            )}
+          </div>
+          <TransactionsTable
+            key={`${from}:${to}`}
+            categories={categories}
+            fixedCategoryId={activeCategory?.category_id}
+            excludeCategoryIds={NON_SPENDING_CATEGORY_IDS}
+            from={from}
+            to={to}
+            defaultSort="recent"
+            collapsibleSearch
+            hideCategoryDropdown
+          />
         </div>
-        <TransactionsTable
-          key={`${from}:${to}`}
-          categories={categories}
-          fixedCategoryId={activeCategory?.category_id}
-          excludeCategoryIds={NON_SPENDING_CATEGORY_IDS}
-          from={from}
-          to={to}
-          defaultSort="recent"
-          collapsibleSearch
-          hideCategoryDropdown
-        />
-      </div>
+      )}
     </div>
   );
 }

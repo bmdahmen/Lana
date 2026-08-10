@@ -7,6 +7,7 @@ import { HOME_RANGES } from "@/lib/net-worth-range";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { NetWorthDashboard } from "@/components/net-worth-dashboard";
 import { getCached, CACHE_KEYS } from "@/lib/cache";
+import { getSession } from "@/lib/session";
 
 const HERO_DEFAULT_DAYS = HOME_RANGES.find((r) => r.label === "5Y")?.days ?? 1825;
 
@@ -40,6 +41,8 @@ interface DashboardData {
 
 export default async function DashboardPage() {
   const db = await getDB();
+  const session = await getSession();
+  const isGuest = session.role === "guest";
 
   const { byClassPoints, accountCount, recentTransactions, accountsByClass } = await getCached(
     CACHE_KEYS.homeDashboard,
@@ -101,7 +104,11 @@ export default async function DashboardPage() {
           </Link>
         </div>
         <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-          {recentTransactions.length === 0 ? (
+          {isGuest ? (
+            <p className="py-8 text-center text-sm text-zinc-500">
+              Transaction line items are hidden in guest view.
+            </p>
+          ) : recentTransactions.length === 0 ? (
             <EmptyState accountCount={accountCount} />
           ) : (
             <ul className="flex flex-col divide-y divide-zinc-100 dark:divide-zinc-900">

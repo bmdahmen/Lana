@@ -1,5 +1,6 @@
 import { getDB } from "@/lib/db";
 import { SpendingBreakdown } from "@/components/spending-breakdown";
+import { getSession } from "@/lib/session";
 
 interface BreakdownRow {
   category_id: string;
@@ -22,6 +23,8 @@ function monthStart(): string {
 
 export default async function SpendingPage() {
   const db = await getDB();
+  const session = await getSession();
+  const isGuest = session.role === "guest";
   const from = monthStart();
 
   const [result, categoriesResult] = await Promise.all([
@@ -49,6 +52,7 @@ export default async function SpendingPage() {
       <SpendingBreakdown
         initialBreakdown={result.results ?? []}
         categories={categoriesResult.results ?? []}
+        hideLineItems={isGuest}
       />
     </div>
   );
