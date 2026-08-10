@@ -5,6 +5,11 @@ import type { Owner } from "@/lib/owners";
 export interface SessionData {
   loggedIn: boolean;
   owner?: Owner;
+  /** "guest" sessions (passcode login) can view everything but the
+   *  middleware blocks them from making any non-GET request -- audit-only
+   *  access. Absent/"owner" means full read-write access, same as before
+   *  this field existed. */
+  role?: "owner" | "guest";
 }
 
 function getSessionOptions(): SessionOptions {

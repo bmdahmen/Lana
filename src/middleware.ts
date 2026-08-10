@@ -2,18 +2,23 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { unsealData } from "iron-session";
 
-const PUBLIC_PATHS = ["/login", "/api/auth/google"];
+const PUBLIC_PATHS = ["/login", "/api/auth/google", "/api/auth/guest"];
+const READ_ONLY_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
-async function hasValidSession(request: NextRequest): Promise<boolean> {
+async function readSession(
+  request: NextRequest
+): Promise<{ loggedIn: boolean; role?: "owner" | "guest" }> {
   const cookie = request.cookies.get("lana_session")?.value;
-  if (!cookie) return false;
+  if (!cookie) return { loggedIn: false };
   const password = process.env.SESSION_SECRET;
-  if (!password || password.length < 32) return false;
+  if (!password || password.length < 32) return { loggedIn: false };
   try {
-    const data = await unsealData<{ loggedIn?: boolean }>(cookie, { password });
-    return data.loggedIn === true;
+    const data = await unsealData<{ loggedIn?: boolean; role?: "owner" | "guest" }>(cookie, {
+      password,
+    });
+    return { loggedIn: data.loggedIn === true, role: data.role };
   } catch {
-    return false;
+    return { loggedIn: false };
   }
 }
 
@@ -31,11 +36,24 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const loggedIn = await hasValidSession(request);
+  const { loggedIn, role } = await readSession(request);
 
   if (!loggedIn && !pathname.startsWith("/login")) {
     const loginUrl = new URL("/login", request.url);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // Guest (passcode) sessions can browse and read everything but never
+  // mutate anything -- audit-only access. Auth endpoints (logout) stay
+  // reachable regardless of method so a guest can still sign out.
+  if (
+    loggedIn &&
+    role === "guest" &&
+    pathname.startsWith("/api/") &&
+    !pathname.startsWith("/api/auth/") &&
+    !READ_ONLY_METHODS.has(request.method)
+  ) {
+    return NextResponse.json({ error: "Guest access is read-only." }, { status: 403 });
   }
 
   return NextResponse.next();
