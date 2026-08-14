@@ -25,6 +25,7 @@ interface AccountRow {
   is_hidden: number;
   asset_class: AssetClass;
   owner: Owner;
+  split_offset: number | null;
   institution_name: string | null;
   item_status: string | null;
   precious_metal: PreciousMetal | null;
@@ -73,7 +74,7 @@ export default async function AccountsPage() {
     const result = await db
       .prepare(
         `SELECT a.id, a.name, a.official_name, a.mask, a.current_balance, a.is_manual, a.is_hidden,
-                a.asset_class, a.owner, p.institution_name, p.status as item_status,
+                a.asset_class, a.owner, a.split_offset, p.institution_name, p.status as item_status,
                 a.precious_metal, a.metal_troy_oz, a.crypto_symbol, a.crypto_amount,
                 a.relevant_from, a.relevant_until, a.property_address,
                 EXISTS(SELECT 1 FROM investment_transaction it WHERE it.account_id = a.id) as has_investment_activity
@@ -129,7 +130,7 @@ export default async function AccountsPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="flex items-center gap-1.5 truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                          <OwnerBadge owner={acc.owner} />
+                          <OwnerBadge owner={acc.owner} splitOffset={acc.split_offset} />
                           {acc.name}
                           {acc.mask && <span className="text-zinc-400"> •••• {acc.mask}</span>}
                         </p>
@@ -144,7 +145,11 @@ export default async function AccountsPage() {
                     <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <AccountCategorySelect accountId={acc.id} assetClass={acc.asset_class} />
-                        <AccountOwnerSelect accountId={acc.id} owner={acc.owner} />
+                        {acc.split_offset != null ? (
+                          <span className="text-xs text-zinc-500">Split 50/50</span>
+                        ) : (
+                          <AccountOwnerSelect accountId={acc.id} owner={acc.owner} />
+                        )}
                       </div>
                       <AccountRowActions
                         accountId={acc.id}
@@ -173,7 +178,7 @@ export default async function AccountsPage() {
                       <tr key={acc.id} className={acc.is_hidden ? "opacity-50" : undefined}>
                         <td className="px-4 py-2.5">
                           <p className="flex items-center gap-1.5 font-medium text-zinc-900 dark:text-zinc-50">
-                            <OwnerBadge owner={acc.owner} />
+                            <OwnerBadge owner={acc.owner} splitOffset={acc.split_offset} />
                             {acc.name}
                             {acc.mask && <span className="text-zinc-400"> •••• {acc.mask}</span>}
                           </p>
@@ -187,7 +192,11 @@ export default async function AccountsPage() {
                         <td className="px-4 py-2.5">
                           <div className="flex flex-wrap items-center gap-2">
                             <AccountCategorySelect accountId={acc.id} assetClass={acc.asset_class} />
-                            <AccountOwnerSelect accountId={acc.id} owner={acc.owner} />
+                            {acc.split_offset != null ? (
+                              <span className="text-xs text-zinc-500">Split 50/50</span>
+                            ) : (
+                              <AccountOwnerSelect accountId={acc.id} owner={acc.owner} />
+                            )}
                           </div>
                         </td>
                         <td className="px-4 py-2.5 text-right font-medium text-zinc-900 dark:text-zinc-50">
