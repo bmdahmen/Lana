@@ -56,7 +56,7 @@ function ownerKey(classId: string, owner: Owner): string {
 async function computeNetWorthSeries(db: D1Database): Promise<NetWorthByClassPoint[]> {
   const result = await db
     .prepare(
-      `SELECT abh.date, abh.current_balance as balance, a.asset_class, a.owner, a.split_offset
+      `SELECT abh.date, abh.current_balance as balance, a.asset_class, a.owner, a.split_offset, a.split_offset_from
        FROM account_balance_history abh
        JOIN account a ON a.id = abh.account_id
        WHERE a.is_closed = 0 AND a.is_hidden = 0
@@ -68,6 +68,7 @@ async function computeNetWorthSeries(db: D1Database): Promise<NetWorthByClassPoi
       asset_class: AssetClass;
       owner: Owner;
       split_offset: number | null;
+      split_offset_from: string | null;
       balance: number;
     }>();
 
@@ -94,15 +95,22 @@ async function computeNetWorthSeries(db: D1Database): Promise<NetWorthByClassPoi
   const byDate = new Map<string, Record<string, number>>();
   for (const row of result.results ?? []) {
     const bucket = byDate.get(row.date) ?? {};
-    if (row.split_offset != null) {
+    const offset = row.split_offset;
+    const splitActive =
+      offset != null && (row.split_offset_from == null || row.date >= row.split_offset_from);
+    if (splitActive) {
       // Jointly-owned account (e.g. a house both contributed unequal down
       // payments to but split all appreciation/paydown since evenly): the
       // balance splits 50/50 plus/minus a fixed dollar offset instead of
       // going wholesale to `owner` -- see migrations/0027_home_equity_split.
+      // split_offset_from gates this to dates on/after the split actually
+      // started (e.g. purchase date), so a historical backfill account that
+      // also carries pre-ownership $0 rows doesn't show a phantom +/-offset
+      // swing for years before the property existed.
       const brianKey = ownerKey(row.asset_class, "brian");
       const emilyKey = ownerKey(row.asset_class, "emily");
-      bucket[brianKey] = (bucket[brianKey] ?? 0) + row.balance / 2 + row.split_offset;
-      bucket[emilyKey] = (bucket[emilyKey] ?? 0) + row.balance / 2 - row.split_offset;
+      bucket[brianKey] = (bucket[brianKey] ?? 0) + row.balance / 2 + offset;
+      bucket[emilyKey] = (bucket[emilyKey] ?? 0) + row.balance / 2 - offset;
     } else {
       const key = ownerKey(row.asset_class, row.owner);
       bucket[key] = (bucket[key] ?? 0) + row.balance;
