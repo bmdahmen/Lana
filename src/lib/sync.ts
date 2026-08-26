@@ -46,14 +46,24 @@ export async function syncAllPlaidItems(db: D1Database): Promise<void> {
     .prepare("SELECT id, access_token, cursor, owner FROM plaid_item WHERE status = 'good'")
     .all<PlaidItemRow>();
 
-  for (const item of items.results ?? []) {
-    try {
-      await syncPlaidItem(db, item);
-    } catch {
-      // Best-effort: one item's sync failure (e.g. a transient Plaid error)
-      // shouldn't block the others or the balance recompute that follows.
-    }
-  }
+  // Independent items, run concurrently rather than one-at-a-time -- with
+  // several Plaid items now connected, syncing them sequentially could push
+  // the whole request's wall-clock duration past the Worker's limit even
+  // though each item's own work is cheap. skipRecompute avoids each item
+  // separately running the (now more expensive, since the owner-split net
+  // worth aggregation) full recomputeNetWorth -- recomputeAccountBalances
+  // does one authoritative recompute after every item has synced instead of
+  // redundantly doing it once per item.
+  await Promise.allSettled(
+    (items.results ?? []).map(async (item) => {
+      try {
+        await syncPlaidItem(db, item, { skipRecompute: true });
+      } catch {
+        // Best-effort: one item's sync failure (e.g. a transient Plaid error)
+        // shouldn't block the others or the balance recompute that follows.
+      }
+    })
+  );
 }
 
 /**
@@ -106,6 +116,14 @@ function accountIsAsset(type: string): boolean {
  * and is skipped quietly -- there's nothing to do but retry on the next sync.
  */
 const INVESTMENT_TRANSACTIONS_LOOKBACK_DAYS = 730;
+// Every sync (nightly cron, webhook, manual refresh) used to re-request the
+// full 730-day window from Plaid for every investment account regardless of
+// how recently it last synced -- an ever-growing cost (more accounts, more
+// history to page through and re-dedupe against) that eventually pushed the
+// Worker past its CPU/resource limit. Once an account has any transactions
+// on file, a short recent window is enough to catch new activity; the full
+// lookback only runs once, on an account's first-ever sync.
+const INVESTMENT_TRANSACTIONS_RECENT_LOOKBACK_DAYS = 35;
 const INVESTMENT_TRANSACTIONS_PAGE_SIZE = 500;
 const BATCH_SIZE = 50;
 
@@ -119,10 +137,21 @@ export async function syncInvestmentTransactions(db: D1Database, item: PlaidItem
   );
   if (accountByPlaidId.size === 0) return;
 
+  const accountIds = [...accountByPlaidId.values()];
+  const hasExisting = await db
+    .prepare(
+      `SELECT 1 FROM investment_transaction WHERE account_id IN (${accountIds.map(() => "?").join(",")}) LIMIT 1`
+    )
+    .bind(...accountIds)
+    .first();
+
   const plaid = getPlaidClient(item.owner);
   const today = new Date().toISOString().slice(0, 10);
   const startDate = new Date();
-  startDate.setDate(startDate.getDate() - INVESTMENT_TRANSACTIONS_LOOKBACK_DAYS);
+  startDate.setDate(
+    startDate.getDate() -
+      (hasExisting ? INVESTMENT_TRANSACTIONS_RECENT_LOOKBACK_DAYS : INVESTMENT_TRANSACTIONS_LOOKBACK_DAYS)
+  );
   const start = startDate.toISOString().slice(0, 10);
 
   const securityNames = new Map<string, string>();
@@ -191,13 +220,13 @@ export async function syncInvestmentTransactions(db: D1Database, item: PlaidItem
   const contentKey = (row: { accountId: string; date: string; name: string; amount: number; type: string; subtype: string }) =>
     `${row.accountId}|${row.date}|${row.name}|${row.amount}|${row.type}|${row.subtype}`;
 
-  const accountIds = [...accountByPlaidId.values()];
   const existing = await db
     .prepare(
       `SELECT plaid_investment_transaction_id, account_id, date, name, amount, type, subtype
-       FROM investment_transaction WHERE account_id IN (${accountIds.map(() => "?").join(",")})`
+       FROM investment_transaction
+       WHERE account_id IN (${accountIds.map(() => "?").join(",")}) AND date >= ?`
     )
-    .bind(...accountIds)
+    .bind(...accountIds, start)
     .all<{
       plaid_investment_transaction_id: string;
       account_id: string;
@@ -274,7 +303,11 @@ export async function syncInvestmentTransactions(db: D1Database, item: PlaidItem
   }
 }
 
-export async function syncPlaidItem(db: D1Database, item: PlaidItemRow): Promise<void> {
+export async function syncPlaidItem(
+  db: D1Database,
+  item: PlaidItemRow,
+  options?: { skipRecompute?: boolean }
+): Promise<void> {
   const plaid = getPlaidClient(item.owner);
 
   let cursor = item.cursor ?? undefined;
@@ -399,7 +432,9 @@ export async function syncPlaidItem(db: D1Database, item: PlaidItemRow): Promise
   }
 
   await syncInvestmentTransactions(db, item);
-  await recomputeNetWorth(db, { force: true });
+  if (!options?.skipRecompute) {
+    await recomputeNetWorth(db, { force: true });
+  }
 }
 
 export async function recomputeNetWorth(
