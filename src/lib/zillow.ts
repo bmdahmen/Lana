@@ -1,4 +1,4 @@
-const ZESTIMATE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const ZESTIMATE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 function getZillowHost(): string {
   return process.env.ZILLOW_RAPIDAPI_HOST || "zillow-real-estate-api.p.rapidapi.com";
@@ -80,7 +80,7 @@ export async function fetchZestimate(address: string): Promise<number> {
   return data.financials.zestimate;
 }
 
-/** Refreshes any real-estate account's cached Zestimate once it's more than a day old. */
+/** Refreshes any real-estate account's cached Zestimate once it's more than a month old. */
 export async function recomputeRealEstateAccountBalances(db: D1Database): Promise<void> {
   const now = Date.now();
   const stale = await db
