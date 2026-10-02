@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getDB, newId } from "@/lib/db";
 import { getPlaidClient } from "@/lib/plaid";
-import { syncPlaidItem, accountIsAsset } from "@/lib/sync";
-import { derivePlaidAssetClass } from "@/lib/asset-classes";
+import { syncPlaidItem, findOpenDuplicateAccount, insertPlaidAccount } from "@/lib/sync";
 
 const exchangeSchema = z.object({
   publicToken: z.string().min(1),
@@ -44,30 +43,29 @@ export async function POST(request: Request) {
 
   const accountsResponse = await plaid.accountsGet({ access_token: accessToken });
   for (const acc of accountsResponse.data.accounts) {
-    await db
-      .prepare(
-        `INSERT INTO account (
-           id, plaid_item_id, plaid_account_id, name, official_name, type, subtype, mask,
-           current_balance, available_balance, iso_currency_code, is_asset, asset_class, owner
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .bind(
-        newId("acct"),
-        itemId,
-        acc.account_id,
-        acc.name,
-        acc.official_name ?? null,
-        acc.type,
-        acc.subtype ?? null,
-        acc.mask ?? null,
-        acc.balances.current ?? null,
-        acc.balances.available ?? null,
-        acc.balances.iso_currency_code ?? "USD",
-        accountIsAsset(acc.type) ? 1 : 0,
-        derivePlaidAssetClass(acc.type, acc.subtype ?? null),
-        body.data.owner
-      )
-      .run();
+    // Reconnecting an already-linked institution hands back fresh Plaid
+    // account IDs for the same real-world accounts — without a content-based
+    // check every account would be imported a second time. Skip the ones we
+    // already track through another linked item.
+    const dupeId = await findOpenDuplicateAccount(
+      db,
+      body.data.owner,
+      body.data.institutionName ?? null,
+      { mask: acc.mask ?? null, type: acc.type },
+      itemId
+    );
+    if (dupeId) continue;
+    await insertPlaidAccount(db, itemId, body.data.owner, {
+      accountId: acc.account_id,
+      name: acc.name,
+      officialName: acc.official_name ?? null,
+      type: acc.type,
+      subtype: acc.subtype ?? null,
+      mask: acc.mask ?? null,
+      currentBalance: acc.balances.current ?? null,
+      availableBalance: acc.balances.available ?? null,
+      isoCurrencyCode: acc.balances.iso_currency_code ?? "USD",
+    });
   }
 
   await syncPlaidItem(db, { id: itemId, access_token: accessToken, cursor: null, owner: body.data.owner });

@@ -1,5 +1,6 @@
 import { getPlaidClient } from "@/lib/plaid";
 import { applyCategoryRules, defaultCategoryFor, isInvestmentAssetClass, type CategoryRule } from "@/lib/categorize";
+import { derivePlaidAssetClass } from "@/lib/asset-classes";
 import { newId } from "@/lib/db";
 import { recomputeSpotPriceAccountBalances } from "@/lib/spot-price";
 import { recomputeRealEstateAccountBalances } from "@/lib/zillow";
@@ -103,6 +104,88 @@ export async function recomputeAccountBalances(
 
 function accountIsAsset(type: string): boolean {
   return type !== "credit" && type !== "loan";
+}
+
+export interface PlaidAccountCandidate {
+  /** Plaid's account_id for this account on this item */
+  accountId: string;
+  name: string;
+  officialName: string | null;
+  type: string;
+  subtype: string | null;
+  mask: string | null;
+  currentBalance: number | null;
+  availableBalance: number | null;
+  isoCurrencyCode: string;
+}
+
+/**
+ * Find an open account row that already represents the same real-world
+ * account as a newly-seen Plaid account, linked through a *different* Plaid
+ * item. Plaid account IDs are unique per linked item, so reconnecting the
+ * same institution (e.g. to pick up a newly opened account) used to import
+ * every account a second time. Match on owner + institution + last-4 + type
+ * instead, and only when exactly one open candidate exists — anything
+ * ambiguous (no mask, several candidates) falls through to normal creation
+ * rather than risk merging two genuinely different accounts.
+ */
+export async function findOpenDuplicateAccount(
+  db: D1Database,
+  owner: Owner,
+  institutionName: string | null,
+  candidate: Pick<PlaidAccountCandidate, "mask" | "type">,
+  excludePlaidItemId: string
+): Promise<string | null> {
+  if (!institutionName || !candidate.mask) return null;
+  const rows = await db
+    .prepare(
+      `SELECT a.id FROM account a
+       JOIN plaid_item i ON i.id = a.plaid_item_id
+       WHERE a.owner = ? AND i.institution_name = ? AND a.mask = ? AND a.type = ?
+         AND a.is_closed = 0 AND a.plaid_item_id != ?`
+    )
+    .bind(owner, institutionName, candidate.mask, candidate.type, excludePlaidItemId)
+    .all<{ id: string }>();
+  const ids = rows.results ?? [];
+  return ids.length === 1 ? ids[0].id : null;
+}
+
+/**
+ * Insert a Plaid account row for a linked item. The caller is responsible
+ * for running findOpenDuplicateAccount first — this never dedupes on its own.
+ */
+export async function insertPlaidAccount(
+  db: D1Database,
+  plaidItemId: string,
+  owner: Owner,
+  acc: PlaidAccountCandidate
+): Promise<string> {
+  const id = newId("acct");
+  await db
+    .prepare(
+      `INSERT INTO account (
+         id, plaid_item_id, plaid_account_id, name, official_name, type, subtype, mask,
+         current_balance, available_balance, iso_currency_code, is_asset, asset_class, owner
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      id,
+      plaidItemId,
+      acc.accountId,
+      acc.name,
+      acc.officialName,
+      acc.type,
+      acc.subtype,
+      acc.mask,
+      acc.currentBalance,
+      acc.availableBalance,
+      acc.isoCurrencyCode,
+      accountIsAsset(acc.type) ? 1 : 0,
+      derivePlaidAssetClass(acc.type, acc.subtype),
+      owner
+    )
+    .run();
+  return id;
 }
 
 /**
@@ -421,14 +504,45 @@ export async function syncPlaidItem(
     .run();
 
   const accountsResponse = await plaid.accountsGet({ access_token: item.access_token });
+  // Institution name for cross-item dedup below — a reconnect hands back
+  // fresh Plaid account IDs, so matching on the ID alone can't tell a new
+  // account from a duplicate of one tracked via another linked item.
+  const itemMeta = await db
+    .prepare("SELECT institution_name FROM plaid_item WHERE id = ?")
+    .bind(item.id)
+    .first<{ institution_name: string | null }>();
   for (const acc of accountsResponse.data.accounts) {
-    await db
+    const updated = await db
       .prepare(
         `UPDATE account SET current_balance = ?, available_balance = ?, updated_at = datetime('now')
          WHERE plaid_account_id = ?`
       )
       .bind(acc.balances.current ?? null, acc.balances.available ?? null, acc.account_id)
       .run();
+    if ((updated.meta?.changes ?? 0) > 0) continue;
+    // Plaid reports an account we have no row for. That's either an account
+    // opened after linking (previously this never got imported without a
+    // manual reconnect) or a duplicate of one tracked via another item —
+    // dedup before creating.
+    const dupeId = await findOpenDuplicateAccount(
+      db,
+      item.owner,
+      itemMeta?.institution_name ?? null,
+      { mask: acc.mask ?? null, type: acc.type },
+      item.id
+    );
+    if (dupeId) continue;
+    await insertPlaidAccount(db, item.id, item.owner, {
+      accountId: acc.account_id,
+      name: acc.name,
+      officialName: acc.official_name ?? null,
+      type: acc.type,
+      subtype: acc.subtype ?? null,
+      mask: acc.mask ?? null,
+      currentBalance: acc.balances.current ?? null,
+      availableBalance: acc.balances.available ?? null,
+      isoCurrencyCode: acc.balances.iso_currency_code ?? "USD",
+    });
   }
 
   await syncInvestmentTransactions(db, item);
