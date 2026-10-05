@@ -16,7 +16,7 @@ import { recomputeAccountBalances } from "@/lib/sync";
  */
 export async function POST(request: Request) {
   const { env } = await getCloudflareContext({ async: true });
-  const secret = (env as Record<string, string | undefined>).CRON_SECRET;
+  const secret = (env as CloudflareEnv & { CRON_SECRET?: string }).CRON_SECRET;
   if (!secret || request.headers.get("x-cron-secret") !== secret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
