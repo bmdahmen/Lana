@@ -17,8 +17,14 @@ jobs:
 
       - run: npm ci
 
-      - name: Build and deploy to Cloudflare
+      - name: Generate worker types
+        run: npm run cf:types
+
+      - name: Build for Cloudflare
+        run: npx opennextjs-cloudflare build
+
+      - name: Deploy to Cloudflare
         # Needs the CLOUDFLARE_API_TOKEN repo secret (Cloudflare token with Workers Scripts Edit)
-        run: npm run cf:deploy
+        run: npx opennextjs-cloudflare deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
