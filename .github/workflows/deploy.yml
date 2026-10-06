@@ -22,6 +22,13 @@ jobs:
 
       - name: Build for Cloudflare
         run: npx opennextjs-cloudflare build
+        env:
+          # Public Google OAuth client ID, shared with CalProTrack/StrengthTrack.
+          # Safe to inline: NEXT_PUBLIC_ vars ship in the client bundle by design,
+          # and Google needs the ID in the browser to render the sign-in button.
+          # Must be present at build time -- without it the login page builds with
+          # no client ID and Google sign-in renders as "not configured".
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: 156334413688-usb68f1fldmrhic94mn925l75hnk82pk.apps.googleusercontent.com
 
       - name: Deploy to Cloudflare
         # Needs the CLOUDFLARE_API_TOKEN repo secret (Cloudflare token with Workers Scripts Edit)
