@@ -3,7 +3,7 @@
 import { useState } from "react";
 import clsx from "clsx";
 import type { AssetClass } from "@/lib/asset-classes";
-import { formatCurrency, formatRelativeTime } from "@/lib/format";
+import { formatCurrency, formatDate, formatRelativeTime } from "@/lib/format";
 
 interface ClassSummary {
   id: AssetClass;
@@ -19,14 +19,21 @@ interface AccountSummary {
   current_balance: number | null;
   mask: string | null;
   updated_at: string;
+  /** Balance as of asOfDate, when the dashboard is scrubbing the chart --
+   *  otherwise the account just renders its current balance. */
+  displayBalance?: number;
 }
 
 export function CategoryBreakdown({
   classes,
   accounts,
+  asOfDate = null,
 }: {
   classes: ClassSummary[];
   accounts: AccountSummary[];
+  /** Scrubbed chart date: account values below render as of this date
+   *  instead of today, matching the category tiles above. */
+  asOfDate?: string | null;
 }) {
   const [expanded, setExpanded] = useState<AssetClass | null>(null);
 
@@ -34,7 +41,11 @@ export function CategoryBreakdown({
   const activeAccounts = active
     ? accounts
         .filter((a) => a.asset_class === active.id)
-        .sort((a, b) => (b.current_balance ?? 0) - (a.current_balance ?? 0))
+        .sort(
+          (a, b) =>
+            (b.displayBalance ?? b.current_balance ?? 0) -
+            (a.displayBalance ?? a.current_balance ?? 0)
+        )
     : [];
 
   return (
@@ -84,8 +95,9 @@ export function CategoryBreakdown({
           </div>
           {activeAccounts.length === 0 && (
             <p className="px-4 py-6 text-center text-sm text-zinc-500">
-              No currently active accounts in this category — the total reflects carried-forward
-              history from an account no longer counted toward today&apos;s balance.
+              {asOfDate
+                ? `No accounts in this category had a balance as of ${formatDate(asOfDate)}.`
+                : "No currently active accounts in this category — the total reflects carried-forward history from an account no longer counted toward today's balance."}
             </p>
           )}
           <ul className="flex flex-col divide-y divide-zinc-100 dark:divide-zinc-900">
@@ -97,11 +109,13 @@ export function CategoryBreakdown({
                     {acc.mask && <span className="text-zinc-400"> •••• {acc.mask}</span>}
                   </p>
                   <p className="text-xs text-zinc-500">
-                    Last checked {formatRelativeTime(acc.updated_at)}
+                    {asOfDate
+                      ? `Balance on ${formatDate(asOfDate)}`
+                      : `Last checked ${formatRelativeTime(acc.updated_at)}`}
                   </p>
                 </div>
                 <span className="shrink-0 pl-2 text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                  {formatCurrency(acc.current_balance ?? 0)}
+                  {formatCurrency(acc.displayBalance ?? acc.current_balance ?? 0)}
                 </span>
               </li>
             ))}
