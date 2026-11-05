@@ -13,6 +13,7 @@ import {
   sliceNetWorthPointsByDays,
   type NetWorthByClassPoint,
 } from "@/lib/net-worth-range";
+import type { AccountBalanceHistory } from "@/lib/queries";
 
 type OwnerFilter = Owner | "family";
 
@@ -29,16 +30,19 @@ interface AccountSummary {
   mask: string | null;
   updated_at: string;
   owner: Owner;
+  relevant_until: string | null;
 }
 
 export function NetWorthDashboard({
   initialPoints,
   initialDays,
   accounts,
+  accountHistory,
 }: {
   initialPoints: NetWorthByClassPoint[];
   initialDays: number;
   accounts: AccountSummary[];
+  accountHistory: AccountBalanceHistory;
 }) {
   const [days, setDays] = useState(initialDays);
   const [owner, setOwner] = useState<OwnerFilter>("family");
@@ -76,7 +80,7 @@ export function NetWorthDashboard({
 
   // Scoped to the same owner as the toggle above -- displayPoint already
   // carries owner-remapped class values, so this just reads them straight
-  // through. The account list below is filtered to match (scopedAccounts),
+  // through. The account list below is filtered to match (displayAccounts),
   // so the tiles and the list always agree.
   const classBreakdown = displayPoint
     ? NET_WORTH_DISPLAY_CLASSES.filter((cls) => Number(displayPoint[cls.id] ?? 0) !== 0)
@@ -87,6 +91,71 @@ export function NetWorthDashboard({
         .sort((a, b) => b.value - a.value)
     : [];
   const scopedAccounts = owner === "family" ? accounts : accounts.filter((a) => a.owner === owner);
+
+  // Today's list: only accounts inside their relevancy window, as before.
+  // (The page now passes every open, visible account so the scrubbed list
+  // below can also reach accounts whose window has since expired.)
+  const today = new Date().toISOString().slice(0, 10);
+  const currentAccounts = scopedAccounts.filter(
+    (a) => a.relevant_until == null || a.relevant_until >= today
+  );
+
+  // When scrubbing, each account's value follows the scrubbed date the same
+  // way the tiles above already do -- but with the series' exact semantics,
+  // which carry each owner-class total forward as a unit (see
+  // computeNetWorthSeries): the value at a date is the sum of that group's
+  // rows on the latest date on or before it where ANY account in the group
+  // reported. An account that stopped reporting -- e.g. a Historical
+  // backfill account replaced by a live Plaid account in July 2026 -- drops
+  // out as soon as another account in its group reports, instead of
+  // lingering carried-forward alongside its replacement and double-counting
+  // the tile. The list is built from every account with history, not just
+  // today's list, so scrubbing back before the July 2026 re-link shows the
+  // Historical accounts that actually make up the aggregates there. Not
+  // scrubbing keeps today's balances exactly as before.
+  const displayAccounts = useMemo(() => {
+    if (!scrubPoint) return currentAccounts;
+    const byGroup = new Map<string, AccountSummary[]>();
+    for (const acc of scopedAccounts) {
+      const group = byGroup.get(`${acc.owner}:${acc.asset_class}`) ?? [];
+      group.push(acc);
+      byGroup.set(`${acc.owner}:${acc.asset_class}`, group);
+    }
+    const out: (AccountSummary & { displayBalance: number })[] = [];
+    for (const group of byGroup.values()) {
+      let groupDate: string | null = null;
+      const lastByAccount = new Map<string, { date: string; balance: number }>();
+      for (const acc of group) {
+        const series = accountHistory[acc.id];
+        if (!series) continue;
+        let lo = 0;
+        let hi = series.length - 1;
+        let found = -1;
+        while (lo <= hi) {
+          const mid = (lo + hi) >> 1;
+          if (series[mid].date <= scrubPoint.date) {
+            found = mid;
+            lo = mid + 1;
+          } else {
+            hi = mid - 1;
+          }
+        }
+        if (found < 0) continue;
+        lastByAccount.set(acc.id, series[found]);
+        if (groupDate == null || series[found].date > groupDate) {
+          groupDate = series[found].date;
+        }
+      }
+      if (groupDate == null) continue;
+      for (const acc of group) {
+        const row = lastByAccount.get(acc.id);
+        if (row && row.date === groupDate) {
+          out.push({ ...acc, displayBalance: row.balance });
+        }
+      }
+    }
+    return out;
+  }, [currentAccounts, scopedAccounts, scrubPoint, accountHistory]);
 
   return (
     <div className="flex flex-col">
@@ -171,7 +240,11 @@ export function NetWorthDashboard({
               Explore by account →
             </Link>
           </div>
-          <CategoryBreakdown classes={classBreakdown} accounts={scopedAccounts} />
+          <CategoryBreakdown
+            classes={classBreakdown}
+            accounts={displayAccounts}
+            asOfDate={scrubPoint?.date ?? null}
+          />
         </section>
       )}
     </div>
