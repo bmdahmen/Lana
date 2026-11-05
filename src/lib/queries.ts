@@ -177,3 +177,37 @@ async function computeNetWorthSeries(db: D1Database): Promise<NetWorthByClassPoi
 
   return points;
 }
+
+export interface AccountBalancePoint {
+  date: string;
+  balance: number;
+}
+
+/** Per-account balance history, one ascending series per account id. This is
+ *  what lets the dashboard's account list follow the chart's scrub date the
+ *  same way the class aggregates already do: the caller carries each
+ *  account's value forward from its last row on or before the scrubbed
+ *  date, mirroring computeNetWorthSeries' carry-forward. Same account
+ *  filters as the series (open, visible, within the relevancy window). */
+export type AccountBalanceHistory = Record<string, AccountBalancePoint[]>;
+
+export async function getAccountBalanceHistory(
+  db: D1Database
+): Promise<AccountBalanceHistory> {
+  const result = await db
+    .prepare(
+      `SELECT abh.account_id, abh.date, abh.current_balance as balance
+       FROM account_balance_history abh
+       JOIN account a ON a.id = abh.account_id
+       WHERE a.is_closed = 0 AND a.is_hidden = 0
+         AND (a.relevant_until IS NULL OR abh.date <= a.relevant_until)
+       ORDER BY abh.account_id ASC, abh.date ASC`
+    )
+    .all<{ account_id: string; date: string; balance: number }>();
+
+  const history: AccountBalanceHistory = {};
+  for (const row of result.results ?? []) {
+    (history[row.account_id] ??= []).push({ date: row.date, balance: row.balance });
+  }
+  return history;
+}
